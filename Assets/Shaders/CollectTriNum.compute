@@ -1,11 +1,3 @@
-﻿//PGRTerrain: Procedural Generation and Rendering of Terrain
-//DH2323 Course Project in KTH
-//CollectTriNum.compute
-//Yang Zhou: yanzho@kth.se
-//Yanbo Huang: yanboh@kth.se
-//Huiting Wang: huitingw@kth.se
-//2015.5
-
 #pragma kernel CollectTriNum
 
 #define BLOCK_SIZE 8
@@ -29,7 +21,7 @@ void FillCube(int blockIdx, uint3 cellIdx, out float cube[8])
 	cube[1] = _Samples[start + 1];
 	cube[2] = _Samples[start + 1 + INC_SAMPLE_SIZE];
 	cube[3] = _Samples[start + INC_SAMPLE_SIZE];
-	
+
 	//up
 	cube[4] = _Samples[start + INC_SAMPLE_SIZE*INC_SAMPLE_SIZE];
 	cube[5] = _Samples[start + 1 + INC_SAMPLE_SIZE*INC_SAMPLE_SIZE];
