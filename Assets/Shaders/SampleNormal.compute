@@ -1,0 +1,34 @@
+﻿//PGRTerrain: Procedural Generation and Rendering of Terrain
+//DH2323 Course Project in KTH
+//SampleNormal.compute
+//Yang Zhou: yanzho@kth.se
+//Yanbo Huang: yanboh@kth.se
+//Huiting Wang: huitingw@kth.se
+//2015.5
+
+#pragma kernel SampleNormal
+
+#define BLOCK_SIZE 8
+#define SAMPLE_SIZE 9
+#define SAMPLE_SIZE_2D 81
+#define SAMPLE_SIZE_3D 729
+#define INC_SAMPLE_SIZE 10
+#define INC_SAMPLE_SIZE_2D 100
+#define INC_SAMPLE_SIZE_3D 1000
+
+StructuredBuffer<float> _Samples;
+
+RWStructuredBuffer<float3> _Normals;
+
+[numthreads(SAMPLE_SIZE,SAMPLE_SIZE,SAMPLE_SIZE)]
+void SampleNormal (uint3 threadId : SV_GroupThreadID, int3 groupId :SV_GroupID)
+{
+	int inIdx = groupId.x * INC_SAMPLE_SIZE_3D + threadId.x + threadId.y * INC_SAMPLE_SIZE + threadId.z * INC_SAMPLE_SIZE_2D;
+	float value = _Samples[inIdx];
+	float dx = value - _Samples[inIdx + 1];
+	float dy = value - _Samples[inIdx + INC_SAMPLE_SIZE];
+	float dz = value - _Samples[inIdx + INC_SAMPLE_SIZE_2D];
+
+	int outIdx = groupId.x * SAMPLE_SIZE_3D + threadId.x + threadId.y * SAMPLE_SIZE + threadId.z * SAMPLE_SIZE_2D;
+	_Normals[outIdx] = normalize(float3(dx,dy,dz));
+}
