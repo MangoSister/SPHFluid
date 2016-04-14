@@ -4,70 +4,109 @@ using System.Collections;
 
 namespace SPHFluid
 {
+    public struct Vector3d
+    {
+        public double x, y, z;
+
+        public Vector3d(double x, double y, double z)
+        {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+        public Vector3d(Vector3 vec3f)
+        {
+            x = vec3f.x;
+            y = vec3f.y;
+            z = vec3f.z;
+        }
+
+        public double magnitude
+        {  get { return Math.Sqrt(x * x + y * y + z * z); } }
+
+        public double sqrMagnitude
+        { get { return x * x + y * y + z * z; } }
+
+        public static double Dot(Vector3d lhs, Vector3d rhs)
+        {
+            return lhs.x * lhs.x + lhs.y * lhs.y + lhs.z * lhs.z;
+        }
+
+
+        public override string ToString()
+        {
+            return string.Format("({0}, {1}, {2})", x, y, z);
+        }
+    }
+
+
+
+    public struct Int3 : IEquatable<Int3>
+    {
+        public int _x, _y, _z;
+        public Int3(int x, int y, int z)
+        { _x = x; _y = y; _z = z; }
+
+        public bool Equals(Int3 other)
+        { return _x == other._x && _y == other._y && _z == other._z; }
+
+        public override bool Equals(object obj)
+        {
+            if (obj == null)
+                return false;
+            if (!(obj is Int3))
+                return false;
+            Int3 other = (Int3)obj;
+            return _x == other._x && _y == other._y && _z == other._z;
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 23 + _x.GetHashCode();
+                hash = hash * 23 + _y.GetHashCode();
+                hash = hash * 23 + _z.GetHashCode();
+                return hash;
+            }
+        }
+    }
+
+    public struct Int2 : IEquatable<Int2>
+    {
+        public int _x, _y;
+        public Int2(int x, int y)
+        { _x = x; _y = y; }
+
+        public bool Equals(Int2 other)
+        { return _x == other._x && _y == other._y; }
+
+        public override bool Equals(object obj)
+        {
+            if (obj == null)
+                return false;
+            if (!(obj is Int2))
+                return false;
+            Int2 other = (Int2)obj;
+            return _x == other._x && _y == other._y;
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 23 + _x.GetHashCode();
+                hash = hash * 23 + _y.GetHashCode();
+                return hash;
+            }
+        }
+    }
+
     public static class MathHelper
     {
-        public struct Int3 : IEquatable<Int3>
-        {
-            public int _x, _y, _z;
-            public Int3(int x, int y, int z)
-            { _x = x; _y = y; _z = z; }
 
-            public bool Equals(Int3 other)
-            { return _x == other._x && _y == other._y && _z == other._z; }
-
-            public override bool Equals(object obj)
-            {
-                if (obj == null)
-                    return false;
-                if (!(obj is Int3))
-                    return false;
-                Int3 other = (Int3)obj;
-                return _x == other._x && _y == other._y && _z == other._z;
-            }
-
-            public override int GetHashCode()
-            {
-                unchecked
-                {
-                    int hash = 17;
-                    hash = hash * 23 + _x.GetHashCode();
-                    hash = hash * 23 + _y.GetHashCode();
-                    hash = hash * 23 + _z.GetHashCode();
-                    return hash;
-                }
-            }
-        }
-
-        public struct Int2 : IEquatable<Int2>
-        {
-            public int _x, _y;
-            public Int2(int x, int y)
-            { _x = x; _y = y; }
-
-            public bool Equals(Int2 other)
-            { return _x == other._x && _y == other._y; }
-
-            public override bool Equals(object obj)
-            {
-                if (obj == null)
-                    return false;
-                if (!(obj is Int2))
-                    return false;
-                Int2 other = (Int2)obj;
-                return _x == other._x && _y == other._y;
-            }
-
-            public override int GetHashCode()
-            {
-                unchecked
-                {
-                    int hash = 17;
-                    hash = hash * 23 + _x.GetHashCode();
-                    hash = hash * 23 + _y.GetHashCode();
-                    return hash;
-                }
-            }
-        }
         public static bool InfLineIntersection(Vector2 l1p1, Vector2 l1p2, Vector2 l2p1, Vector2 l2p2, out Vector2 intersection)
         {
             intersection = Vector2.zero;

@@ -2,7 +2,6 @@
 using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
-using Int3 = SPHFluid.MathHelper.Int3;
 
 namespace SPHFluid.Render
 {

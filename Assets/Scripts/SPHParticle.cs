@@ -1,11 +1,14 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class SPHParticle
+namespace SPHFluid
 {
-    public float mass;
-    public Vector3 position;
-    public Vector3 velocity;
-    public float color;
-    public Vector3 colorGradient;
+    public class SPHParticle
+    {
+        public double mass;
+        public Vector3d position;
+        public Vector3d velocity;
+        public double color;
+        public Vector3d colorGradient;
+    }
 }
