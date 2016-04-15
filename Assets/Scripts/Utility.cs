@@ -8,7 +8,7 @@ namespace SPHFluid
     {
         public double x, y, z;
 
-        public Vector3d(double x, double y, double z)
+        public Vector3d(double x = 0, double y = 0, double z = 0)
         {
             this.x = x;
             this.y = y;
@@ -21,17 +21,65 @@ namespace SPHFluid
             z = vec3f.z;
         }
 
+        public double inv_magnitude
+        { get { return 1 / Math.Sqrt(x * x + y * y + z * z); } }
+
         public double magnitude
         {  get { return Math.Sqrt(x * x + y * y + z * z); } }
 
         public double sqrMagnitude
         { get { return x * x + y * y + z * z; } }
 
+        public void Normalize()
+        {
+            double inv_mag = inv_magnitude;
+            x *= inv_mag;
+            y *= inv_mag;
+            z *= inv_mag;
+        }
+
+        public Vector3d normalized
+        {
+            get
+            {
+                Vector3d copy = new Vector3d(x, y, z);
+                copy.Normalize();
+                return copy;
+            }
+        }
+
+        public static Vector3d operator +(Vector3d lhs, Vector3d rhs)
+        {
+            return new Vector3d(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z);
+        }
+
+        public static Vector3d operator -(Vector3d lhs, Vector3d rhs)
+        {
+            return new Vector3d(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
+        }
+
+        public static Vector3d operator *(Vector3d lhs, double rhs)
+        {
+            return new Vector3d(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
+        }
+
+        public static Vector3d operator *(double lhs, Vector3d rhs)
+        {
+            return new Vector3d(lhs * rhs.x, lhs * rhs.y, lhs * rhs.z);
+        }
+
+        public static Vector3d operator /(Vector3d lhs, double rhs)
+        {
+            return new Vector3d(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs);
+        }
+
         public static double Dot(Vector3d lhs, Vector3d rhs)
         {
             return lhs.x * lhs.x + lhs.y * lhs.y + lhs.z * lhs.z;
         }
 
+        public static readonly Vector3d zero = new Vector3d(0, 0, 0);
+        public static readonly Vector3d one = new Vector3d(1, 1, 1);
 
         public override string ToString()
         {
