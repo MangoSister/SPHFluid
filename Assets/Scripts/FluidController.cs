@@ -8,8 +8,38 @@ namespace SPHFluid
     public class FluidController : MonoBehaviour
     {
         public MarchingCubeEngine mcEngine;
+        private SPHSolver sphSolver;
+
+        public int maxParticleNum;
+        public float updateInterval;
+        public double timeStep;
+        public double kernelRadius;
+        public double gasConst;
+        public double restDensity;
+        public double viscosity;
+        public double tensionCoef;
+
+        [HideInInspector]
+        public Vector3d externalAcc;
+        [HideInInspector]
+        public Int3 gridSize;
 
         private void Start()
+        {
+            //ExampleMc()
+            sphSolver = new SPHSolver(maxParticleNum, timeStep, kernelRadius,
+                                        gasConst, restDensity, externalAcc,
+                                        gridSize._x, gridSize._y, gridSize._z);
+            sphSolver.CreateParticle(1, new Vector3d(5, 5, 5), Vector3d.zero);
+            StartCoroutine(Simulate_CR());
+        }
+
+        private void OnDestroy()
+        {
+            mcEngine.Free();
+        }
+
+        private void ExampleMc()
         {
             mcEngine.Init();
             List<Int3> list = new List<Int3>()
@@ -27,16 +57,43 @@ namespace SPHFluid
             for (int ix = 0; ix < mcEngine.width + 2; ix++)
                 for (int iy = 0; iy < mcEngine.height + 2; iy++)
                     for (int iz = 0; iz < mcEngine.length + 2; iz++)
-                        mcEngine.voxelSamples[ix, iy, iz] = - (new Vector3(ix, iy, iz) - Vector3.one * 8f).sqrMagnitude + 64f;
+                        mcEngine.voxelSamples[ix, iy, iz] = -(new Vector3(ix, iy, iz) - Vector3.one * 8f).sqrMagnitude + 64f;
 
             mcEngine.BatchUpdate(list);
         }
 
-
-
-        private void OnDestroy()
+        private IEnumerator Simulate_CR()
         {
-            mcEngine.Free();
+            sphSolver.Init();
+            while (true)
+            {
+                yield return new WaitForSeconds(updateInterval);
+                sphSolver.Step();
+                //update MarchingCubeEngine
+            }
         }
+
+#if UNITY_EDITOR
+        private void OnDrawGizmos()
+        {
+            Gizmos.color = Color.cyan;
+            Vector3 extent = new Vector3(gridSize._x, gridSize._y, gridSize._z) * (float)kernelRadius * 0.5f;
+            Vector3 center = transform.position + extent;
+            Gizmos.DrawWireCube(center, extent * 2);
+            Gizmos.color = Color.white;
+
+            if (sphSolver != null && sphSolver.allParticles != null && sphSolver.allParticles.Count > 0)
+            {
+                for (int i = 0; i < sphSolver.allParticles.Count; ++i)
+                {
+                    Vector3 pos = transform.position;
+                    pos += new Vector3((float)sphSolver.allParticles[i].currData.position.x,
+                        (float)sphSolver.allParticles[i].currData.position.y,
+                        (float)sphSolver.allParticles[i].currData.position.z);
+                    Gizmos.DrawSphere(pos, 0.2f);
+                }
+            }
+        }
+#endif
     }
 }

@@ -84,7 +84,7 @@ namespace SPHFluid
 
         public double timeStep;
         public double kernelRadius;
-        public double tempK;
+        public double gasConst;
         public double restDensity;
         public Vector3d externalAcc;
         public double viscosity;
@@ -95,13 +95,21 @@ namespace SPHFluid
         public int gridCountXYZ, gridCountXY, gridCountXZ, gridCountYZ;
         public SPHGridCell[] grid;
 
-        public SPHSolver(int maxParticleNum, double timeStep, double kernelRadius, int gridSizeX, int gridSizeY, int gridSizeZ)
+        public bool isSolving { get; private set; }
+
+        public SPHSolver(int maxParticleNum, double timeStep, double kernelRadius, 
+                        double gasConst, double restDensity, Vector3d externalAcc, 
+                        int gridSizeX, int gridSizeY, int gridSizeZ)
         {
             this.maxParticleNum = maxParticleNum;
             allParticles = new List<SPHParticle>();
             allParticles.Capacity = maxParticleNum;
             this.timeStep = timeStep;
             this.kernelRadius = kernelRadius;
+            this.gasConst = gasConst;
+            this.restDensity = restDensity;
+            this.externalAcc = externalAcc;
+
             gridSize = new Int3(gridSizeX, gridSizeY, gridSizeZ);
             gridCountXYZ = gridSizeX * gridSizeY * gridSizeZ;
             gridCountXY = gridSizeX * gridSizeY;
@@ -113,8 +121,10 @@ namespace SPHFluid
                     for (int z = 0; z < gridSize._z; ++z)
                     {
                         grid[x * gridCountYZ + y * gridSize._z + z] = new SPHGridCell(x, y, z);
-                        grid[x * gridCountYZ + y * gridSize._z + z].particles.Capacity = maxParticleNum; //maybe not a good idea
+                        //grid[x * gridCountYZ + y * gridSize._z + z].particles.Capacity = maxParticleNum; //maybe not a good idea
                     }
+
+            isSolving = false;
         }
 
         public Int3 FindCellIdx(Vector3d pos)
@@ -198,7 +208,7 @@ namespace SPHFluid
 
         public bool CreateParticle(double mass, Vector3d initPos, Vector3d initVelo, out SPHParticle particle)
         {
-            if (currParticleNum >= maxParticleNum)
+            if (currParticleNum >= maxParticleNum || isSolving)
             {
                 particle = null;
                 return false;
@@ -219,7 +229,7 @@ namespace SPHFluid
 
         public bool CreateParticle(double mass, Vector3d initPos, Vector3d initVelo)
         {
-            if (currParticleNum >= maxParticleNum)
+            if (currParticleNum >= maxParticleNum || isSolving)
                 return false;
 
             SPHParticle particle = new SPHParticle();
@@ -246,18 +256,18 @@ namespace SPHFluid
                     adjacentCells[n]._y * gridSize._z +
                     adjacentCells[n]._z];
 
-                for (int p = 0; p < cell.particles.Count; ++p)
-                {
-                    SPHParticle neighbor = cell.particles[p];
+                foreach (SPHParticle neighbor in cell.particles)
                     particle.density += neighbor.mass * KernelPoly6(particle.currData.position - neighbor.currData.position, kernelRadius);
-                }
+
             }
 
-            particle.pressure = tempK * (particle.density - restDensity);
+            particle.pressure = gasConst * (particle.density - restDensity);
 
             //force: pressure & viscosity & tension
             particle.forcePressure = Vector3d.zero;
             particle.forceViscosity = Vector3d.zero;
+            particle.colorGradient = Vector3d.zero;
+
             double tension = 0;
 
             for (int n = 0; n < adjacentCells.Count; ++n)
@@ -267,10 +277,8 @@ namespace SPHFluid
                     adjacentCells[n]._y * gridSize._z +
                     adjacentCells[n]._z];
 
-                for (int p = 0; p < cell.particles.Count; ++p)
+                foreach (SPHParticle neighbor in cell.particles)
                 {
-                    SPHParticle neighbor = cell.particles[p];
-
                     particle.forcePressure -= 0.5f * neighbor.mass * (particle.pressure + neighbor.pressure) / neighbor.density *
                                    GradKernelSpiky(particle.currData.position - neighbor.currData.position, kernelRadius);
 
@@ -285,9 +293,62 @@ namespace SPHFluid
 
             particle.forceTension = tension * particle.colorGradient.normalized;
         }
-
+        public void ApplyBoundaryCondition(SPHParticle particle)
+        {
+            //simple cube boundary
+            Int3 nextIdx = FindCellIdx(particle.nextData.position);
+            if (nextIdx._x < 0)
+            {
+                Vector3d contact = Vector3d.Lerp(particle.currData.position, particle.nextData.position,
+                    MathHelper.Eps + (-particle.currData.position.x) / (particle.nextData.position.x - particle.currData.position.x));
+                particle.nextData.position = contact;
+                particle.nextData.velocity *= 0.8f;
+                particle.nextData.velocity.x *= -1;
+            }
+            else if (nextIdx._x >= gridSize._x)
+            {
+                Vector3d contact = Vector3d.Lerp(particle.currData.position, particle.nextData.position,
+                    MathHelper.Eps + (gridSize._x * kernelRadius - particle.currData.position.x) / (particle.nextData.position.x - particle.currData.position.x));
+                particle.nextData.position = contact;
+                particle.nextData.velocity *= 0.8f;
+                particle.nextData.velocity.x *= -1;
+            }
+            else if (nextIdx._y < 0)
+            {
+                Vector3d contact = Vector3d.Lerp(particle.currData.position, particle.nextData.position,
+                    MathHelper.Eps + (-particle.currData.position.y) / (particle.nextData.position.y - particle.currData.position.y));
+                particle.nextData.position = contact;
+                particle.nextData.velocity *= 0.8f;
+                particle.nextData.velocity.y *= -1;
+            }
+            else if (nextIdx._y >= gridSize._y)
+            {
+                Vector3d contact = Vector3d.Lerp(particle.currData.position, particle.nextData.position,
+                    MathHelper.Eps + (gridSize._y * kernelRadius - particle.currData.position.y) / (particle.nextData.position.y - particle.currData.position.y));
+                particle.nextData.position = contact;
+                particle.nextData.velocity *= 0.8f;
+                particle.nextData.velocity.y *= -1;
+            }
+            else if (nextIdx._z < 0)
+            {
+                Vector3d contact = Vector3d.Lerp(particle.currData.position, particle.nextData.position,
+                    MathHelper.Eps + (-particle.currData.position.z) / (particle.nextData.position.z - particle.currData.position.z));
+                particle.nextData.position = contact;
+                particle.nextData.velocity *= 0.8f;
+                particle.nextData.velocity.z *= -1;
+            }
+            else if (nextIdx._z >= gridSize._z)
+            {
+                Vector3d contact = Vector3d.Lerp(particle.currData.position, particle.nextData.position,
+                    MathHelper.Eps + (gridSize._z * kernelRadius - particle.currData.position.z) / (particle.nextData.position.z - particle.currData.position.z));
+                particle.nextData.position = contact;
+                particle.nextData.velocity *= 0.8f;
+                particle.nextData.velocity.z *= -1;
+            }
+        }
         public void Init()
         {
+            isSolving = true;
             for (int i = 0; i < currParticleNum; ++i)
             {
                 SPHParticle curr = allParticles[i];
@@ -296,23 +357,34 @@ namespace SPHFluid
                 acc += externalAcc;
                 curr.currData.velocity += 0.5 * acc * timeStep;
             }
+            isSolving = false;
         }
 
         public void Step()
         {
+            isSolving = true;
             for (int i = 0; i < currParticleNum; ++i)
             {
                 SPHParticle curr = allParticles[i];
                 UpdateInternalAcc(curr);
                 Vector3d acc = curr.invMass * (curr.forcePressure + curr.forceViscosity + curr.forceTension);
                 acc += externalAcc;
+                //leap frog integration
                 curr.nextData.position = curr.currData.position + curr.currData.velocity * timeStep;
                 curr.nextData.velocity = curr.currData.velocity + acc * timeStep;
+                ApplyBoundaryCondition(curr);
+
                 //cell update
                 Int3 nextIdx = FindCellIdx(curr.nextData.position);
-                curr.nextData.cell = grid[nextIdx._x * gridCountYZ + nextIdx._y * gridSize._z + nextIdx._z];
+                if (curr.currData.cell.cellIdx.Equals(nextIdx))
+                {
+                    curr.nextData.cell = grid[nextIdx._x * gridCountYZ + nextIdx._y * gridSize._z + nextIdx._z];
+                    curr.currData.cell.particles.Remove(curr);
+                    curr.nextData.cell.particles.Add(curr);
+                }
                 curr.currData = curr.nextData;
             }
+            isSolving = false;
         }
     }
 }

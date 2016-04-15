@@ -35,12 +35,12 @@ namespace SPHFluid
 
     public class SPHGridCell
     {
-        public List<SPHParticle> particles;
+        public HashSet<SPHParticle> particles;
         public Int3 cellIdx;
 
         public SPHGridCell(int x, int y, int z)
         {
-            particles = new List<SPHParticle>();
+            particles = new HashSet<SPHParticle>();
             cellIdx = new Int3(x, y, z);
         }
     }

@@ -4,6 +4,7 @@ using System.Collections;
 
 namespace SPHFluid
 {
+    [Serializable]
     public struct Vector3d
     {
         public double x, y, z;
@@ -78,6 +79,12 @@ namespace SPHFluid
             return lhs.x * lhs.x + lhs.y * lhs.y + lhs.z * lhs.z;
         }
 
+        public static Vector3d Lerp(Vector3d from, Vector3d to, double t)
+        {
+            t = Math.Min(1, Math.Max(t, 0));
+            return from * (1 - t) + to * t;
+        }
+
         public static readonly Vector3d zero = new Vector3d(0, 0, 0);
         public static readonly Vector3d one = new Vector3d(1, 1, 1);
 
@@ -87,8 +94,7 @@ namespace SPHFluid
         }
     }
 
-
-
+    [Serializable]
     public struct Int3 : IEquatable<Int3>
     {
         public int _x, _y, _z;
@@ -121,6 +127,7 @@ namespace SPHFluid
         }
     }
 
+    [Serializable]
     public struct Int2 : IEquatable<Int2>
     {
         public int _x, _y;
@@ -154,7 +161,7 @@ namespace SPHFluid
 
     public static class MathHelper
     {
-
+        public static readonly double Eps = 10e-5;
         public static bool InfLineIntersection(Vector2 l1p1, Vector2 l1p2, Vector2 l2p1, Vector2 l2p2, out Vector2 intersection)
         {
             intersection = Vector2.zero;
