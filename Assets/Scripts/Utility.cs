@@ -125,6 +125,11 @@ namespace SPHFluid
                 return hash;
             }
         }
+
+        public override string ToString()
+        {
+            return string.Format("({0}, {1}, {2})", _x, _y, _z);
+        }
     }
 
     [Serializable]
@@ -156,6 +161,11 @@ namespace SPHFluid
                 hash = hash * 23 + _y.GetHashCode();
                 return hash;
             }
+        }
+
+        public override string ToString()
+        {
+            return string.Format("({0}, {1})", _x, _y);
         }
     }
 

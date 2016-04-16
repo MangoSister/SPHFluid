@@ -150,19 +150,22 @@ namespace SPHFluid.Render
         /// </summary>
         public void Free()
         {
-            for (int x = 0; x < width / blockSize; x++)
-                for (int y = 0; y < height / blockSize; y++)
-                    for (int z = 0; z < length / blockSize; z++)
-                    {
-                        if (_blocks[x, y, z] == null)
-                            continue;
-                        if (_blocks[x, y, z].GetComponent<MeshFilter>().mesh != null)
-                            _blocks[x, y, z].GetComponent<MeshFilter>().mesh.Clear();
-                        if (_blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh != null)
-                            _blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh.Clear();
-                        Destroy(_blocks[x, y, z]);
-                        _blocks[x, y, z] = null;
-                    }
+            if (_blocks != null)
+            {
+                for (int x = 0; x < width / blockSize; x++)
+                    for (int y = 0; y < height / blockSize; y++)
+                        for (int z = 0; z < length / blockSize; z++)
+                        {
+                            if (_blocks[x, y, z] == null)
+                                continue;
+                            if (_blocks[x, y, z].GetComponent<MeshFilter>().mesh != null)
+                                _blocks[x, y, z].GetComponent<MeshFilter>().mesh.Clear();
+                            if (_blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh != null)
+                                _blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh.Clear();
+                            Destroy(_blocks[x, y, z]);
+                            _blocks[x, y, z] = null;
+                        }
+            }
 
             if (_bufferCornerToEdgeTable != null)
             {

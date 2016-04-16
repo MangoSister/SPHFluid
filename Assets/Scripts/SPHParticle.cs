@@ -9,6 +9,7 @@ namespace SPHFluid
         public Vector3d position;
         public Vector3d velocity;
         public SPHGridCell cell;
+        public bool onSurface = false;
     }
 
 
@@ -19,6 +20,7 @@ namespace SPHFluid
         public double mass;
         public double invMass;
 
+        public List<Int3> neighborSpace;
         public double density;
         public double pressure;
         public Vector3d forcePressure;
@@ -30,6 +32,8 @@ namespace SPHFluid
         {
             currData = new SPHParticleMotionInfo();
             nextData = new SPHParticleMotionInfo();
+            neighborSpace = new List<Int3>();
+            neighborSpace.Capacity = 27;
         }
     }
 

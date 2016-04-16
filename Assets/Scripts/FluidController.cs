@@ -29,8 +29,10 @@ namespace SPHFluid
             //ExampleMc()
             sphSolver = new SPHSolver(maxParticleNum, timeStep, kernelRadius,
                                         gasConst, restDensity, externalAcc,
+                                        viscosity, tensionCoef,
                                         gridSize._x, gridSize._y, gridSize._z);
-            sphSolver.CreateParticle(1, new Vector3d(5, 5, 5), Vector3d.zero);
+            sphSolver.CreateParticle(1, new Vector3d(4.9, 5, 5), Vector3d.zero);
+            sphSolver.CreateParticle(1, new Vector3d(5.1, 5, 5), Vector3d.zero);
             StartCoroutine(Simulate_CR());
         }
 
@@ -90,7 +92,7 @@ namespace SPHFluid
                     pos += new Vector3((float)sphSolver.allParticles[i].currData.position.x,
                         (float)sphSolver.allParticles[i].currData.position.y,
                         (float)sphSolver.allParticles[i].currData.position.z);
-                    Gizmos.DrawSphere(pos, 0.2f);
+                    Gizmos.DrawWireSphere(pos, 0.2f);
                 }
             }
         }
