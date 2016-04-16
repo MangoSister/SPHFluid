@@ -32,7 +32,7 @@ namespace SPHFluid
                                         viscosity, tensionCoef,
                                         gridSize._x, gridSize._y, gridSize._z);
             sphSolver.CreateParticle(1, new Vector3d(4.9, 5, 5), Vector3d.zero);
-            sphSolver.CreateParticle(1, new Vector3d(5.1, 5, 5), Vector3d.zero);
+            //sphSolver.CreateParticle(1, new Vector3d(5.1, 5, 5), Vector3d.zero);
             StartCoroutine(Simulate_CR());
         }
 

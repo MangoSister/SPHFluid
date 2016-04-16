@@ -77,11 +77,11 @@ namespace SPHFluid
 
         public static double LaplacianKernelViscosity(Vector3d r, double h)
         {
-            double mag = r.magnitude;
-            if (h - mag < 0)
+            double diff = h - r.magnitude;
+            if (diff < 0)
                 return 0;
             double inv_h6 = 1 / (h * h * h * h * h * h);
-            return lapkViscosityConst * inv_h6 * mag;
+            return lapkViscosityConst * inv_h6 * diff;
         }
         #endregion
 
@@ -415,10 +415,10 @@ namespace SPHFluid
             }
             else if (nextIdx._y < 0)
             {
-                Vector3d contact = Vector3d.Lerp(particle.currData.position, particle.nextData.position,
-                    - MathHelper.Eps + (-particle.currData.position.y) / (particle.nextData.position.y - particle.currData.position.y));
+                double t = (-particle.currData.position.y) / (particle.nextData.position.y - particle.currData.position.y);
+                Vector3d contact = Vector3d.Lerp(particle.currData.position, particle.nextData.position, /* - MathHelper.Eps +*/ t);
                 particle.nextData.position = contact;
-                particle.nextData.velocity *= 0.8f;
+                particle.nextData.velocity = Vector3d.Lerp(particle.currData.velocity, particle.nextData.velocity, t) * 0.8f;
                 particle.nextData.velocity.y *= -1;
             }
             else if (nextIdx._y >= gridSize._y)
