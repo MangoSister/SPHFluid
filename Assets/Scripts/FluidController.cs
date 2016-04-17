@@ -14,10 +14,11 @@ namespace SPHFluid
         public float updateInterval;
         public double timeStep;
         public double kernelRadius;
-        public double gasConst;
+        public double stiffness;
         public double restDensity;
         public double viscosity;
         public double tensionCoef;
+        public double surfaceThreshold;
 
         [HideInInspector]
         public Vector3d externalAcc;
@@ -28,17 +29,34 @@ namespace SPHFluid
         {
             //ExampleMc()
             sphSolver = new SPHSolver(maxParticleNum, timeStep, kernelRadius,
-                                        gasConst, restDensity, externalAcc,
-                                        viscosity, tensionCoef,
+                                        stiffness, restDensity, externalAcc,
+                                        viscosity, tensionCoef, surfaceThreshold,
                                         gridSize._x, gridSize._y, gridSize._z);
-            sphSolver.CreateParticle(1, new Vector3d(4.9, 5, 5), Vector3d.zero);
-            //sphSolver.CreateParticle(1, new Vector3d(5.1, 5, 5), Vector3d.zero);
+
+
+            CreateDirFlow();
+
             StartCoroutine(Simulate_CR());
         }
 
         private void OnDestroy()
         {
             mcEngine.Free();
+        }
+
+        private void CreateTest25Square()
+        {
+            for (int x = 0; x < 5; ++x)
+                for (int z = 0; z < 5; ++z)
+                {
+                    sphSolver.CreateParticle(1, new Vector3d(5 + 0.1 * x, 4.9, 5 + 0.1 * z), Vector3d.zero);
+                }
+        }
+
+        private void CreateDirFlow()
+        {
+            for (int x = 0; x < 20; ++x)
+                sphSolver.CreateParticle(1, new Vector3d(5 + 0.1 * x, 4.9, 5), new Vector3d(5,0,0));
         }
 
         private void ExampleMc()
@@ -70,7 +88,9 @@ namespace SPHFluid
             while (true)
             {
                 yield return new WaitForSeconds(updateInterval);
-                sphSolver.Step();
+                //yield return null;
+               // if (Input.GetKeyDown(KeyCode.S))
+                    sphSolver.Step();
                 //update MarchingCubeEngine
             }
         }

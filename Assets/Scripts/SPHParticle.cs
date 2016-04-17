@@ -19,6 +19,7 @@ namespace SPHFluid
         public SPHParticleMotionInfo nextData;
         public double mass;
         public double invMass;
+        public Vector3d midVelocity;
 
         public List<Int3> neighborSpace;
         public double density;

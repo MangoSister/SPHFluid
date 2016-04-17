@@ -76,7 +76,7 @@ namespace SPHFluid
 
         public static double Dot(Vector3d lhs, Vector3d rhs)
         {
-            return lhs.x * lhs.x + lhs.y * lhs.y + lhs.z * lhs.z;
+            return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
         }
 
         public static Vector3d Lerp(Vector3d from, Vector3d to, double t)
