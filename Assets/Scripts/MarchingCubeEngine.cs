@@ -240,9 +240,9 @@ namespace SPHFluid.Render
                                 = implicitSurface(queryX, queryY, queryZ);
                         }
             }
-#if UNITY_EDITOR
-            float startTime = Time.realtimeSinceStartup;
-#endif
+//#if UNITY_EDITOR
+//            float startTime = Time.realtimeSinceStartup;
+//#endif
             ////rebuild normals
             ComputeBuffer bufferSamples = new ComputeBuffer(nextUpdateblocks.Count * (ag2BlockSize) * (ag2BlockSize) * (ag2BlockSize), sizeof(float));
             bufferSamples.SetData(samples);
@@ -279,9 +279,9 @@ namespace SPHFluid.Render
                 bufferCornerFlags.Release();
                 return;
             }
-#if UNITY_EDITOR
-            //Debug.Log("triangles count " + triNum[0]);
-#endif
+//#if UNITY_EDITOR
+//            //Debug.Log("triangles count " + triNum[0]);
+//#endif
             //STAGE II: do marching cube
             ComputeBuffer bufferMeshes = new ComputeBuffer(triNum[0], CSTriangle.stride);
             ComputeBuffer bufferTriEndIndex = new ComputeBuffer(1, sizeof(int));
@@ -339,9 +339,9 @@ namespace SPHFluid.Render
             }
 
             //Debug.Log("Time taken: " + (Time.realtimeSinceStartup - startTime) * 1000.0f);
-#if UNITY_EDITOR
-            print("Time taken: " + (Time.realtimeSinceStartup - startTime) * 1000.0f);
-#endif
+//#if UNITY_EDITOR
+//            print("Time taken: " + (Time.realtimeSinceStartup - startTime) * 1000.0f);
+//#endif
             bufferNormals.Release();
             bufferSamples.Release();
 

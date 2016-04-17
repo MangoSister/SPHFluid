@@ -34,8 +34,9 @@ namespace SPHFluid
                                         gridSize._x, gridSize._y, gridSize._z);
 
 
-            CreateTest25Square();
+            //CreateTest25Square();
             //CreateDirFlow();
+            CreateTest125Cube();
 
             sphSolver.Init();
 
@@ -58,6 +59,16 @@ namespace SPHFluid
                 {
                     sphSolver.CreateParticle(1, new Vector3d(5 + 0.1 * x, 4.9, 5 + 0.1 * z), Vector3d.zero);
                 }
+        }
+
+        private void CreateTest125Cube()
+        {
+            for (int x = 0; x < 5; ++x)
+                for (int y = 0; y < 5; ++y)
+                    for (int z = 0; z < 5; ++z)
+                    {
+                        sphSolver.CreateParticle(1, new Vector3d(5 + 0.1 * x, 5 + 0.1 * y, 5 + 0.1 * z), Vector3d.zero);
+                    }
         }
 
         private void CreateDirFlow()
@@ -117,7 +128,14 @@ namespace SPHFluid
         {
             double value;
             Vector3d normal;
-            sphSolver.SampleSurface(new Vector3d(x, y, z) * mcEngine.engineScale, out value, out normal);
+            Vector3d pos = new Vector3d(x, y, z) * mcEngine.engineScale;
+            if (pos.x >= gridSize._x * kernelRadius)
+                pos.x = gridSize._x - MathHelper.Eps;
+            if (pos.y >= gridSize._y * kernelRadius)
+                pos.y = gridSize._y - MathHelper.Eps;
+            if (pos.z >= gridSize._z * kernelRadius)
+                pos.z = gridSize._z - MathHelper.Eps;
+            sphSolver.SampleSurface(pos, out value, out normal);
             return (float)value;
         }
 
