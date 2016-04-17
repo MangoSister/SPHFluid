@@ -34,8 +34,14 @@ namespace SPHFluid
                                         gridSize._x, gridSize._y, gridSize._z);
 
 
-            //CreateTest25Square();
-            CreateDirFlow();
+            CreateTest25Square();
+            //CreateDirFlow();
+
+            sphSolver.Init();
+
+            mcEngine.engineScale = (float)gridSize._x / (float)mcEngine.width;
+            mcEngine.implicitSurface = SampleFluidSurfaceVoxel;
+            mcEngine.Init();
 
             StartCoroutine(Simulate_CR());
         }
@@ -60,32 +66,30 @@ namespace SPHFluid
                 sphSolver.CreateParticle(1, new Vector3d(5 + 0.1 * x, 4.9, 5), new Vector3d(5,0,0));
         }
 
-        private void ExampleMc()
-        {
-            mcEngine.Init();
-            List<Int3> list = new List<Int3>()
-            {
-                new Int3(0,0,0 ),
-                new Int3(0,0,1 ),
-                new Int3(0,1,0 ),
-                new Int3(0,1,1 ),
-                new Int3(1,0,0 ),
-                new Int3(1,0,1 ),
-                new Int3(1,1,0 ),
-                new Int3(1,1,1 ),
-            };
+        //private void ExampleMc()
+        //{
+        //    List<Int3> list = new List<Int3>()
+        //    {
+        //        new Int3(0,0,0 ),
+        //        new Int3(0,0,1 ),
+        //        new Int3(0,1,0 ),
+        //        new Int3(0,1,1 ),
+        //        new Int3(1,0,0 ),
+        //        new Int3(1,0,1 ),
+        //        new Int3(1,1,0 ),
+        //        new Int3(1,1,1 ),
+        //    };
 
-            for (int ix = 0; ix < mcEngine.width + 2; ix++)
-                for (int iy = 0; iy < mcEngine.height + 2; iy++)
-                    for (int iz = 0; iz < mcEngine.length + 2; iz++)
-                        mcEngine.voxelSamples[ix, iy, iz] = -(new Vector3(ix, iy, iz) - Vector3.one * 8f).sqrMagnitude + 64f;
+        //    for (int ix = 0; ix < mcEngine.width + 2; ix++)
+        //        for (int iy = 0; iy < mcEngine.height + 2; iy++)
+        //            for (int iz = 0; iz < mcEngine.length + 2; iz++)
+        //                mcEngine.voxelSamples[ix, iy, iz] = -(new Vector3(ix, iy, iz) - Vector3.one * 8f).sqrMagnitude + 64f;
 
-            mcEngine.BatchUpdate(list);
-        }
+        //    mcEngine.BatchUpdate(list);
+        //}
 
         private IEnumerator Simulate_CR()
         {
-            sphSolver.Init();
             while (true)
             {
                 yield return new WaitForSeconds(updateInterval);
@@ -99,12 +103,22 @@ namespace SPHFluid
                 {                
                     if (sphSolver.allParticles[i].onSurface)
                     {
-                        Vector3d blockOffset = (sphSolver.allParticles[i].position - mcEngine.engineOrigin) / 
-                                                mcEngine.engineScale / MarchingCubeEngine.blockSize;
+                        Vector3d blockOffset = (sphSolver.allParticles[i].position /*- mcEngine.engineOrigin*/) / 
+                                                (mcEngine.engineScale * MarchingCubeEngine.blockSize);
                         updateMCBlocks.Add(Vector3d.FloorToInt3(blockOffset));
                     }
                 }
+
+                mcEngine.BatchUpdate(new List<Int3>(updateMCBlocks));
             }
+        }
+
+        private float SampleFluidSurfaceVoxel(int x, int y, int z)
+        {
+            double value;
+            Vector3d normal;
+            sphSolver.SampleSurface(new Vector3d(x, y, z) * mcEngine.engineScale, out value, out normal);
+            return (float)value;
         }
 
 #if UNITY_EDITOR

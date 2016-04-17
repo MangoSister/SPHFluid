@@ -38,7 +38,10 @@ namespace SPHFluid.Render
         //x: width, y: height, z: length
         public int width = 16, height = 16, length = 16; // voxel size
         // The samples of the terrain density function
-        public float[, ,] voxelSamples;
+        //public float[, ,] voxelSamples;
+        public delegate float ImplicitSurface(int x, int y, int z); //(x,y,z) : voxel index
+        public ImplicitSurface implicitSurface;
+
         // The size of _voxelSamples should not exceed [1025,1025,1025]
         public const int maxSampleResolution = 1025; //sample size = voxel size + 1   
 
@@ -62,6 +65,10 @@ namespace SPHFluid.Render
         public ComputeShader shaderNormal;
         public ComputeShader shaderCollectTriNum;
         public ComputeShader shaderMarchingCube;
+
+        private int nrmKernel;
+        private int ctnKernel;
+        private int mcKernel;
 
         //Mesh material that should be plugged in
         public Material material;
@@ -101,12 +108,24 @@ namespace SPHFluid.Render
 
             if (shaderNormal == null)    
                 throw new UnityException("null shader: _shaderNormal");
-            
+
+            nrmKernel = shaderNormal.FindKernel("SampleNormal");
+            if (nrmKernel < 0)
+                throw new UnityException("Fail to find kernel of shader: " + shaderNormal.name);
+
             if (shaderCollectTriNum == null)
                 throw new UnityException("null shader: _shaderCollectTriNum");
-            
+
+            ctnKernel = shaderCollectTriNum.FindKernel("CollectTriNum");
+            if (ctnKernel < 0)
+                throw new UnityException("Fail to find kernel of shader: " + shaderCollectTriNum.name);
+
             if (shaderMarchingCube == null)
                 throw new UnityException("null shader: _shaderMarchingCube");
+
+            mcKernel = shaderMarchingCube.FindKernel("MarchingCube");
+            if (mcKernel < 0)
+                throw new UnityException("Fail to find kernel of shader: " + shaderMarchingCube.name);
 
             if (width % blockSize != 0 || height % blockSize != 0 || length % blockSize != 0)
                 throw new UnityException("block size must align to terrain size");
@@ -115,11 +134,11 @@ namespace SPHFluid.Render
                 throw new UnityException("too high resolution (exceeds " + maxSampleResolution + ")");
 
             _blocks = new GameObject[width / blockSize, height / blockSize, length / blockSize];
-            voxelSamples = new float[width + 2, height + 2, length + 2]; //augmented to provide correct normal on positive boundary
-            for (int x = 0; x < width + 2; x++)
-                for (int y = 0; y < height + 2; y++)
-                    for (int z = 0; z < length + 2; z++)
-                        voxelSamples[x, y, z] = voidDensity;
+            //voxelSamples = new float[width + 2, height + 2, length + 2]; //augmented to provide correct normal on positive boundary
+            //for (int x = 0; x < width + 2; x++)
+            //    for (int y = 0; y < height + 2; y++)
+            //        for (int z = 0; z < length + 2; z++)
+            //            voxelSamples[x, y, z] = voidDensity;
 
             _bufferCornerToEdgeTable = new ComputeBuffer(256, sizeof(int));
             _bufferCornerToEdgeTable.SetData(cornerToEdgeTable);
@@ -218,16 +237,13 @@ namespace SPHFluid.Render
                                 iy * (ag2BlockSize) +
                                 iz * (ag2BlockSize) * (ag2BlockSize) +
                                 blockNum * (ag2BlockSize) * (ag2BlockSize) * (ag2BlockSize)]
-                                = voxelSamples[queryX, queryY, queryZ];
+                                = implicitSurface(queryX, queryY, queryZ);
                         }
             }
 #if UNITY_EDITOR
             float startTime = Time.realtimeSinceStartup;
 #endif
             ////rebuild normals
-            int nrmKernel = shaderNormal.FindKernel("SampleNormal");
-            if(nrmKernel < 0)
-                throw new UnityException("Fail to find kernel of shader: " + shaderNormal.name);
             ComputeBuffer bufferSamples = new ComputeBuffer(nextUpdateblocks.Count * (ag2BlockSize) * (ag2BlockSize) * (ag2BlockSize), sizeof(float));
             bufferSamples.SetData(samples);
             shaderNormal.SetBuffer(nrmKernel, "_Samples", bufferSamples);
@@ -240,9 +256,6 @@ namespace SPHFluid.Render
             //marching-cube
 
             //STAGE I: collect triangle number
-            int ctnKernel = shaderCollectTriNum.FindKernel("CollectTriNum");
-            if (ctnKernel < 0)
-                throw new UnityException("Fail to find kernel of shader: " + shaderCollectTriNum.name);
             ComputeBuffer bufferTriNum = new ComputeBuffer(1, sizeof(int));
             bufferTriNum.SetData(new int[] { 0 });
             ComputeBuffer bufferCornerFlags = new ComputeBuffer(nextUpdateblocks.Count * blockSize * blockSize * blockSize, sizeof(int));
@@ -270,9 +283,6 @@ namespace SPHFluid.Render
             //Debug.Log("triangles count " + triNum[0]);
 #endif
             //STAGE II: do marching cube
-            int mcKernel = shaderMarchingCube.FindKernel("MarchingCube");
-            if (mcKernel < 0)
-                throw new UnityException("Fail to find kernel of shader: " + shaderMarchingCube.name);
             ComputeBuffer bufferMeshes = new ComputeBuffer(triNum[0], CSTriangle.stride);
             ComputeBuffer bufferTriEndIndex = new ComputeBuffer(1, sizeof(int));
             bufferTriEndIndex.SetData(new int[] { 0 });

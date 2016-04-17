@@ -92,7 +92,7 @@ namespace SPHFluid
 
         public static Int3 FloorToInt3(Vector3d vec)
         {
-            return new Int3((int)Math.Floor(vec.x), (int)Math.Floor(vec.x), (int)Math.Floor(vec.x));
+            return new Int3((int)Math.Floor(vec.x), (int)Math.Floor(vec.y), (int)Math.Floor(vec.z));
         }
 
         public static readonly Vector3d zero = new Vector3d(0, 0, 0);

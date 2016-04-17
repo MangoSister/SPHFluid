@@ -62,7 +62,7 @@ namespace SPHFluid
                 return Vector3d.zero;
             double inv_h6 = 1 / (h * h * h * h * h * h);
             r /= mag;
-            return gradKSpikyConst * inv_h6 * diff  * diff * r;
+            return gradKSpikyConst * inv_h6 * diff * diff * r;
         }
 
         public static double KernelViscosity(Vector3d r, double h)
@@ -105,8 +105,8 @@ namespace SPHFluid
 
         public bool isSolving { get; private set; }
 
-        public SPHSolver(int maxParticleNum, double timeStep, double kernelRadius, 
-                        double stiffness, double restDensity, Vector3d externalAcc, 
+        public SPHSolver(int maxParticleNum, double timeStep, double kernelRadius,
+                        double stiffness, double restDensity, Vector3d externalAcc,
                         double viscosity, double tensionCoef, double surfaceThreshold,
                         int gridSizeX, int gridSizeY, int gridSizeZ)
         {
@@ -500,12 +500,42 @@ namespace SPHFluid
                 if (!curr.cell.cellIdx.Equals(nextIdx))
                 {
                     curr.cell.particles.Remove(curr);
-                    curr.cell = grid[nextIdx._x * gridCountYZ + nextIdx._y * gridSize._z + nextIdx._z];          
+                    curr.cell = grid[nextIdx._x * gridCountYZ + nextIdx._y * gridSize._z + nextIdx._z];
                     curr.cell.particles.Add(curr);
                 }
             }
-            
+
             isSolving = false;
+        }
+
+        public void SampleSurface(Vector3d pos, out double value, out Vector3d normal)
+        {
+            value = 0;
+            normal = Vector3d.zero;
+            List<Int3> neighborSpace = FindNeighborSpace(FindCellIdx(pos));
+            if (neighborSpace == null)
+                Debug.Log(pos);
+            for (int n = 0; n < neighborSpace.Count; ++n)
+            {
+                SPHGridCell cell = grid[neighborSpace[n]._x * gridCountYZ +
+                                    neighborSpace[n]._y * gridSize._z +
+                                    neighborSpace[n]._z];
+                foreach (SPHParticle neighbor in cell.particles)
+                {
+                    value += neighbor.mass / neighbor.density * KernelPoly6(pos - neighbor.position, kernelRadius);
+                    normal += neighbor.mass / neighbor.density * GradKernelPoly6(pos - neighbor.position, kernelRadius);
+                }
+
+            }
+
+            if (value > 0)
+            {
+                value -= surfaceThreshold;
+                normal.Normalize();
+                normal *= -1;
+            }
+            else
+                value = -surfaceThreshold;
         }
     }
 }
