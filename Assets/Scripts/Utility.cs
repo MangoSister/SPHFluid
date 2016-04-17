@@ -59,6 +59,11 @@ namespace SPHFluid
             return new Vector3d(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
         }
 
+        public static Vector3d operator -(Vector3d lhs, Vector3 rhs)
+        {
+            return new Vector3d(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z);
+        }
+
         public static Vector3d operator *(Vector3d lhs, double rhs)
         {
             return new Vector3d(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs);
@@ -83,6 +88,11 @@ namespace SPHFluid
         {
             t = Math.Min(1, Math.Max(t, 0));
             return from * (1 - t) + to * t;
+        }
+
+        public static Int3 FloorToInt3(Vector3d vec)
+        {
+            return new Int3((int)Math.Floor(vec.x), (int)Math.Floor(vec.x), (int)Math.Floor(vec.x));
         }
 
         public static readonly Vector3d zero = new Vector3d(0, 0, 0);

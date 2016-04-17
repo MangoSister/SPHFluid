@@ -34,6 +34,7 @@ namespace SPHFluid
                                         gridSize._x, gridSize._y, gridSize._z);
 
 
+            //CreateTest25Square();
             CreateDirFlow();
 
             StartCoroutine(Simulate_CR());
@@ -91,7 +92,18 @@ namespace SPHFluid
                 //yield return null;
                // if (Input.GetKeyDown(KeyCode.S))
                     sphSolver.Step();
+
                 //update MarchingCubeEngine
+                HashSet<Int3> updateMCBlocks = new HashSet<Int3>();
+                for (int i = 0; i < sphSolver.currParticleNum; ++i)
+                {                
+                    if (sphSolver.allParticles[i].onSurface)
+                    {
+                        Vector3d blockOffset = (sphSolver.allParticles[i].position - mcEngine.engineOrigin) / 
+                                                mcEngine.engineScale / MarchingCubeEngine.blockSize;
+                        updateMCBlocks.Add(Vector3d.FloorToInt3(blockOffset));
+                    }
+                }
             }
         }
 
@@ -109,9 +121,9 @@ namespace SPHFluid
                 for (int i = 0; i < sphSolver.allParticles.Count; ++i)
                 {
                     Vector3 pos = transform.position;
-                    pos += new Vector3((float)sphSolver.allParticles[i].currData.position.x,
-                        (float)sphSolver.allParticles[i].currData.position.y,
-                        (float)sphSolver.allParticles[i].currData.position.z);
+                    pos += new Vector3((float)sphSolver.allParticles[i].position.x,
+                        (float)sphSolver.allParticles[i].position.y,
+                        (float)sphSolver.allParticles[i].position.z);
                     Gizmos.DrawWireSphere(pos, 0.2f);
                 }
             }

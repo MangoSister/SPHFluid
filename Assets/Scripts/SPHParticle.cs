@@ -4,22 +4,16 @@ using System.Collections.Generic;
 
 namespace SPHFluid
 {
-    public class SPHParticleMotionInfo
+    public class SPHParticle
     {
+        public double mass;
+        public double invMass;
         public Vector3d position;
         public Vector3d velocity;
         public SPHGridCell cell;
         public bool onSurface = false;
-    }
-
-
-    public class SPHParticle
-    {
-        public SPHParticleMotionInfo currData;
-        public SPHParticleMotionInfo nextData;
-        public double mass;
-        public double invMass;
         public Vector3d midVelocity;
+        public Vector3d prevVelocity;
 
         public List<Int3> neighborSpace;
         public double density;
@@ -31,8 +25,6 @@ namespace SPHFluid
 
         public SPHParticle()
         {
-            currData = new SPHParticleMotionInfo();
-            nextData = new SPHParticleMotionInfo();
             neighborSpace = new List<Int3>();
             neighborSpace.Capacity = 27;
         }
