@@ -16,67 +16,59 @@ namespace SPHFluid
         public static readonly double kViscosityConst = 2.387324146378;
         public static readonly double lapkViscosityConst = 14.3239448783;
 
-        public static double KernelPoly6(Vector3d r, double h)
+        public double KernelPoly6(Vector3d r)
         {
-            double sqrDiff = (h * h - r.sqrMagnitude);
+            double sqrDiff = (kr2 - r.sqrMagnitude);
             if (sqrDiff < 0)
                 return 0;
-            double inv_h9 = 1 / (h * h * h * h * h * h * h * h * h);
-            return kPoly6Const * inv_h9 * sqrDiff * sqrDiff * sqrDiff;
+            return kPoly6Const * inv_kr9 * sqrDiff * sqrDiff * sqrDiff;
         }
 
-        public static Vector3d GradKernelPoly6(Vector3d r, double h)
+        public Vector3d GradKernelPoly6(Vector3d r)
         {
-            double sqrDiff = (h * h - r.sqrMagnitude);
+            double sqrDiff = (kr2 - r.sqrMagnitude);
             if (sqrDiff < 0)
                 return Vector3d.zero;
-            double inv_h9 = 1 / (h * h * h * h * h * h * h * h * h);
-            return gradKPoly6Const * inv_h9 * sqrDiff * sqrDiff * r;
+            return gradKPoly6Const * inv_kr9 * sqrDiff * sqrDiff * r;
         }
 
-        public static double LaplacianKernelPoly6(Vector3d r, double h)
+        public double LaplacianKernelPoly6(Vector3d r)
         {
-            double h2 = h * h;
             double r2 = r.sqrMagnitude;
-            double sqrDiff = (h2 - r2);
+            double sqrDiff = (kr2 - r2);
             if (sqrDiff < 0)
                 return 0;
-            double inv_h9 = 1 / (h2 * h2 * h2 * h2 * h);
-            return lapKPoly6Const * inv_h9 * sqrDiff * (3 * h2 - 7 * r2);
+            return lapKPoly6Const * inv_kr9 * sqrDiff * (3 * kr2 - 7 * r2);
         }
 
-        public static double KernelSpiky(Vector3d r, double h)
+        public double KernelSpiky(Vector3d r)
         {
-            double diff = h - r.magnitude;
+            double diff = kernelRadius - r.magnitude;
             if (diff < 0)
                 return 0;
-            double inv_h6 = 1 / (h * h * h * h * h * h);
-            return kSpikyConst * inv_h6 * diff * diff * diff;
+            return kSpikyConst * inv_kr6 * diff * diff * diff;
         }
 
-        public static Vector3d GradKernelSpiky(Vector3d r, double h)
+        public Vector3d GradKernelSpiky(Vector3d r)
         {
             double mag = r.magnitude;
-            double diff = (h - mag);
+            double diff = (kernelRadius - mag);
             if (diff < 0 || mag <= 0)
                 return Vector3d.zero;
-            double inv_h6 = 1 / (h * h * h * h * h * h);
             r /= mag;
-            return gradKSpikyConst * inv_h6 * diff * diff * r;
+            return gradKSpikyConst * inv_kr6 * diff * diff * r;
         }
 
-        public static double KernelViscosity(Vector3d r, double h)
+        public double KernelViscosity(Vector3d r)
         {
             double mag = r.magnitude;
-            if (h - mag < 0)
+            if (kernelRadius - mag < 0)
                 return 0;
-            double h2 = h * h;
-            double inv_h3 = 1 / (h * h2);
             double sqrMag = mag * mag;
-            return kViscosityConst * inv_h3 * (-0.5 * mag * sqrMag * inv_h3 + sqrMag / (h2) + 0.5 * h / mag - 1);
+            return kViscosityConst * inv_kr3 * (-0.5 * mag * sqrMag * inv_kr3 + sqrMag / (kr2) + 0.5 * kernelRadius / mag - 1);
         }
 
-        public static double LaplacianKernelViscosity(Vector3d r, double h)
+        public double LaplacianKernelViscosity(Vector3d r, double h)
         {
             double diff = h - r.magnitude;
             if (diff < 0)
@@ -92,6 +84,9 @@ namespace SPHFluid
 
         public double timeStep;
         public double kernelRadius;
+        #region Precomputed Values
+        private double kr2, inv_kr3, inv_kr6, inv_kr9;
+        #endregion
         public double stiffness;
         public double restDensity;
         public Vector3d externalAcc;
@@ -116,6 +111,12 @@ namespace SPHFluid
 
             this.timeStep = timeStep;
             this.kernelRadius = kernelRadius;
+
+            kr2 = kernelRadius * kernelRadius;
+            inv_kr3 = 1 / (kernelRadius * kr2);
+            inv_kr6 = inv_kr3 * inv_kr3;
+            inv_kr9 = inv_kr6 * inv_kr3;
+
             this.stiffness = stiffness;
             this.restDensity = restDensity;
             this.externalAcc = externalAcc;
@@ -352,7 +353,7 @@ namespace SPHFluid
                     particle.neighborSpace[n]._z];
 
                 foreach (SPHParticle neighbor in cell.particles)
-                    particle.density += neighbor.mass * KernelPoly6(particle.position - neighbor.position, kernelRadius);
+                    particle.density += neighbor.mass * KernelPoly6(particle.position - neighbor.position);
 
             }
 
@@ -382,14 +383,14 @@ namespace SPHFluid
                     if (!ReferenceEquals(particle, neighbor))
                     {
                         particle.forcePressure -= 0.5f * neighbor.mass * (particle.pressure + neighbor.pressure) / neighbor.density *
-                                       GradKernelSpiky(particle.position - neighbor.position, kernelRadius);
+                                       GradKernelSpiky(particle.position - neighbor.position);
 
                         particle.forceViscosity += viscosity * neighbor.mass *
                                            (neighbor.velocity - particle.velocity) / neighbor.density *
                                            LaplacianKernelViscosity(particle.position - neighbor.position, kernelRadius);
                     }
-                    particle.colorGradient += neighbor.mass / neighbor.density * GradKernelPoly6(particle.position - neighbor.position, kernelRadius);
-                    tension -= neighbor.mass / neighbor.density * LaplacianKernelPoly6(particle.position - neighbor.position, kernelRadius);
+                    particle.colorGradient += neighbor.mass / neighbor.density * GradKernelPoly6(particle.position - neighbor.position);
+                    tension -= neighbor.mass / neighbor.density * LaplacianKernelPoly6(particle.position - neighbor.position);
                 }
             }
 
@@ -522,8 +523,8 @@ namespace SPHFluid
                                     neighborSpace[n]._z];
                 foreach (SPHParticle neighbor in cell.particles)
                 {
-                    value += neighbor.mass / neighbor.density * KernelPoly6(pos - neighbor.position, kernelRadius);
-                    normal += neighbor.mass / neighbor.density * GradKernelPoly6(pos - neighbor.position, kernelRadius);
+                    value += neighbor.mass / neighbor.density * KernelPoly6(pos - neighbor.position);
+                    normal += neighbor.mass / neighbor.density * GradKernelPoly6(pos - neighbor.position);
                 }
 
             }
