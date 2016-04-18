@@ -103,10 +103,16 @@ namespace SPHFluid
         {
             while (true)
             {
-                yield return new WaitForSeconds(updateInterval);
-                //yield return null;
-               // if (Input.GetKeyDown(KeyCode.S))
-                    sphSolver.Step();
+                //yield return new WaitForSeconds(updateInterval);
+                yield return null;
+                if (!Input.GetKeyDown(KeyCode.S))
+                    continue;
+
+#if UNITY_EDITOR
+                float startTime = Time.realtimeSinceStartup;
+#endif
+
+                sphSolver.Step();
 
                 //update MarchingCubeEngine
                 HashSet<Int3> updateMCBlocks = new HashSet<Int3>();
@@ -120,6 +126,9 @@ namespace SPHFluid
                     }
                 }
 
+#if UNITY_EDITOR
+                print("Time taken: " + (Time.realtimeSinceStartup - startTime) * 1000.0f);
+#endif
                 mcEngine.BatchUpdate(new List<Int3>(updateMCBlocks));
             }
         }
