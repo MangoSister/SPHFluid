@@ -68,13 +68,12 @@ namespace SPHFluid
             return kViscosityConst * inv_kr3 * (-0.5 * mag * sqrMag * inv_kr3 + sqrMag / (kr2) + 0.5 * kernelRadius / mag - 1);
         }
 
-        public double LaplacianKernelViscosity(Vector3d r, double h)
+        public double LaplacianKernelViscosity(Vector3d r)
         {
-            double diff = h - r.magnitude;
+            double diff = kernelRadius - r.magnitude;
             if (diff < 0)
                 return 0;
-            double inv_h6 = 1 / (h * h * h * h * h * h);
-            return lapkViscosityConst * inv_h6 * diff;
+            return lapkViscosityConst * inv_kr6 * diff;
         }
         #endregion
 
@@ -387,7 +386,7 @@ namespace SPHFluid
 
                         particle.forceViscosity += viscosity * neighbor.mass *
                                            (neighbor.velocity - particle.velocity) / neighbor.density *
-                                           LaplacianKernelViscosity(particle.position - neighbor.position, kernelRadius);
+                                           LaplacianKernelViscosity(particle.position - neighbor.position);
                     }
                     particle.colorGradient += neighbor.mass / neighbor.density * GradKernelPoly6(particle.position - neighbor.position);
                     tension -= neighbor.mass / neighbor.density * LaplacianKernelPoly6(particle.position - neighbor.position);
