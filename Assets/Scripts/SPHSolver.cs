@@ -55,7 +55,7 @@ namespace SPHFluid
             double diff = (kernelRadius - mag);
             if (diff < 0 || mag <= 0)
                 return Vector3d.zero;
-            r /= mag;
+            r *= (1 / mag);
             return gradKSpikyConst * inv_kr6 * diff * diff * r;
         }
 
