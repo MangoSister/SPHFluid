@@ -1,12 +1,14 @@
 ﻿#include "SPHInclude.compute"
 #pragma kernel SampleFluid
 
+//Input
 StructuredBuffer<uint3> _Blocks;
 StructuredBuffer<uint> _ParticleStartIndexPerCell;
 StructuredBuffer<Particle> _Particles;
 
-RWStructuredBuffer<double> _Samples;
-RWStructuredBuffer<double3> _Normals;
+//Output
+RWBuffer<float> _Samples;
+RWStructuredBuffer<float3> _Normals;
 
 [numthreads(SAMPLE_SIZE,SAMPLE_SIZE,SAMPLE_SIZE)] // NOTICE use SAMPLE_SIZE here
 void SampleFluid  (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
@@ -19,35 +21,35 @@ void SampleFluid  (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 					 cellIdx.z * SAMPLE_SIZE_2D;
 
 	//compute world position for each MC sample cell
-	 double3 worldPos = double3
-	((double)(_Blocks[blockIdx].x * BLOCK_SIZE + cellIdx.x),
-	 (double)(_Blocks[blockIdx].y * BLOCK_SIZE + cellIdx.y),
-	 (double)(_Blocks[blockIdx].z * BLOCK_SIZE + cellIdx.z));
+	 float3 worldPos = float3
+	((float)(_Blocks[blockIdx].x * BLOCK_SIZE + cellIdx.x),
+	 (float)(_Blocks[blockIdx].y * BLOCK_SIZE + cellIdx.y),
+	 (float)(_Blocks[blockIdx].z * BLOCK_SIZE + cellIdx.z));
 
-	worldPos *= (double)_inv_KernelRadius;
+	worldPos *= _inv_KernelRadius;
 	uint3 cellWorldIdx = floor(worldPos);
-
+	
 	//find neighbor space
 	bool neighbor[27];
 	FindNeighborSpace(cellWorldIdx, neighbor);
 
 	_Samples[outputIdx] = 0;
-	_Normals[outputIdx] = double3(0, 0, 0);
+	_Normals[outputIdx] = float3(0, 0, 0);
 	for(uint i = 0; i < 27; ++i)
 	{
 		if(neighbor[i])
 		{
 			//get particles from each neighbor SPH grid cell
-			uint3 neighborIdx = cellWorldIdx + neighbor[i];
+			uint3 neighborIdx = cellWorldIdx + neighborOffset[i];
 			uint neighborIdx1d = neighborIdx.x * _SphGridSize.y * _SphGridSize.z +
 								 neighborIdx.y * _SphGridSize.z + 
 								 neighborIdx.z;
 			uint start = _ParticleStartIndexPerCell[neighborIdx1d];
-			uint end = _ParticleStartIndexPerCell[neighborIdx1d + 1]; //bug: last element?
+			uint end = _ParticleStartIndexPerCell[neighborIdx1d + 1]; //bug: last element? -> one more element
 			for(uint n = start; n < end; ++n)
 			{
-				_Samples[outputIdx] += _Particles[n]._mass / _Particles[n]._density * KernelPoly6(worldPos - _Particles[n]._position);
-				_Normals[outputIdx] += _Particles[n]._mass / _Particles[n]._density * GradKernelPoly6(worldPos - _Particles[n]._position);
+				_Samples[outputIdx] += _Particles[n]._mass * _Particles[n]._inv_density * KernelPoly6(worldPos - _Particles[n]._position);
+				_Normals[outputIdx] += _Particles[n]._mass * _Particles[n]._inv_density * GradKernelPoly6(worldPos - _Particles[n]._position);
 			}
 		}
 	}
