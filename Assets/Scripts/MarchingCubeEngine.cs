@@ -62,11 +62,11 @@ namespace SPHFluid.Render
         private GameObject[, ,] _blocks;
 
         //Compute shaders that should be plugged in.
-        public ComputeShader shaderNormal;
+        public ComputeShader shaderSample;
         public ComputeShader shaderCollectTriNum;
         public ComputeShader shaderMarchingCube;
 
-        private int nrmKernel;
+        private int sampleKernel;
         private int ctnKernel;
         private int mcKernel;
 
@@ -106,12 +106,12 @@ namespace SPHFluid.Render
             if (material == null)
                 throw new UnityException("null material");
 
-            if (shaderNormal == null)    
-                throw new UnityException("null shader: _shaderNormal");
+            if (shaderSample == null)
+                throw new UnityException("null shader: _shaderSample");
 
-            nrmKernel = shaderNormal.FindKernel("SampleNormal");
-            if (nrmKernel < 0)
-                throw new UnityException("Fail to find kernel of shader: " + shaderNormal.name);
+            sampleKernel = shaderSample.FindKernel("SampleFluid");
+            if (sampleKernel < 0)
+                throw new UnityException("Fail to find kernel of shader: " + shaderSample.name);
 
             if (shaderCollectTriNum == null)
                 throw new UnityException("null shader: _shaderCollectTriNum");
@@ -250,11 +250,10 @@ namespace SPHFluid.Render
             ////rebuild normals
             ComputeBuffer bufferSamples = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float));
             bufferSamples.SetData(samples);
-            shaderNormal.SetBuffer(nrmKernel, "_Samples", bufferSamples);
 
             ComputeBuffer bufferNormals = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float) * 3);
             bufferNormals.SetData(sampleNormals);
-
+          
             //marching-cube
 
             //STAGE I: collect triangle number
