@@ -84,7 +84,7 @@ namespace SPHFluid
         public double timeStep;
         public double kernelRadius;
         #region Precomputed Values
-        private double kr2, inv_kr3, inv_kr6, inv_kr9;
+        public double kr2, inv_kr3, inv_kr6, inv_kr9;
         #endregion
         public double stiffness;
         public double restDensity;

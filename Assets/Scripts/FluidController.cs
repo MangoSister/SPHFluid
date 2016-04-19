@@ -42,7 +42,7 @@ namespace SPHFluid
 
             mcEngine.engineScale = (float)gridSize._x / (float)mcEngine.width;
             mcEngine.implicitSurface = SampleFluidSurfaceVoxel;
-            mcEngine.Init();
+            mcEngine.Init(sphSolver);
 
             StartCoroutine(Simulate_CR());
         }

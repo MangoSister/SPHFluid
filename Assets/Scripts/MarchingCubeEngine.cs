@@ -35,6 +35,22 @@ namespace SPHFluid.Render
             public static int stride = sizeof(float) * 3 * 6 + sizeof(int);
         };
 
+        private struct CSParticle
+        {
+            public float mass;
+            public float inv_density;
+            public Vector3 position;
+
+            public CSParticle(float mass, float inv_density, Vector3 position)
+            {
+                this.mass = mass;
+                this.inv_density = inv_density;
+                this.position = position;
+            }
+
+            public static int stride = sizeof(float) * 5;
+        }
+
         //x: width, y: height, z: length
         public int width = 16, height = 16, length = 16; // voxel size
         // The samples of the terrain density function
@@ -77,6 +93,8 @@ namespace SPHFluid.Render
         private ComputeBuffer _bufferCornerToEdgeTable;
         private ComputeBuffer _bufferCornerToTriNumTable;
         private ComputeBuffer _bufferCornerToVertTable;
+        private ComputeBuffer _bufferParticles;
+        private ComputeBuffer _bufferParticlesStartIndex;
 
         //The position of engine (engineTransform.position -> origin)
         public Transform engineTransform;
@@ -91,6 +109,8 @@ namespace SPHFluid.Render
         //voxel index -> world pos: (voxel index - 0) * engineScale + engineOrigin
         //world pos -> voxel index (space): (world pos - engineOrigin) / engineScale
 
+        public SPHSolver sphSolver;
+
 #if UNITY_EDITOR
         public bool drawBlockWireFrames = false;
         public bool drawCellWireFrames = false;
@@ -101,7 +121,7 @@ namespace SPHFluid.Render
         /// Allocate compute buffers
         /// Initial other data sturctures, parameters, etc
         /// </summary>
-        public void Init()
+        public void Init(SPHSolver sphSolver)
         {
             if (material == null)
                 throw new UnityException("null material");
@@ -134,16 +154,11 @@ namespace SPHFluid.Render
                 throw new UnityException("too high resolution (exceeds " + maxSampleResolution + ")");
 
             _blocks = new GameObject[width / blockSize, height / blockSize, length / blockSize];
-            //voxelSamples = new float[width + 2, height + 2, length + 2]; //augmented to provide correct normal on positive boundary
-            //for (int x = 0; x < width + 2; x++)
-            //    for (int y = 0; y < height + 2; y++)
-            //        for (int z = 0; z < length + 2; z++)
-            //            voxelSamples[x, y, z] = voidDensity;
 
             _bufferCornerToEdgeTable = new ComputeBuffer(256, sizeof(int));
             _bufferCornerToEdgeTable.SetData(cornerToEdgeTable);
             _bufferCornerToTriNumTable = new ComputeBuffer(256, sizeof(int));
-            _bufferCornerToTriNumTable.SetData(cornerToTriNumTable);   
+            _bufferCornerToTriNumTable.SetData(cornerToTriNumTable);
             _bufferCornerToVertTable = new ComputeBuffer(256 * 15, sizeof(int));
             _bufferCornerToVertTable.SetData(cornerToVertTable);
 
@@ -162,6 +177,19 @@ namespace SPHFluid.Render
                         var pos = new Vector3(x, y, z) * (float)blockSize * engineScale;
                         _blocks[x, y, z].transform.localPosition = pos;
                     }
+
+            this.sphSolver = sphSolver;
+
+            _bufferParticles = new ComputeBuffer(sphSolver.currParticleNum, CSParticle.stride);
+            _bufferParticlesStartIndex = new ComputeBuffer(sphSolver.gridCountXYZ + 1, sizeof(int));
+
+            shaderSample.SetInts("_SphGridSize", sphSolver.gridSize._x, sphSolver.gridSize._y, sphSolver.gridSize._z);
+            shaderSample.SetFloat("_KernelRadius", (float)sphSolver.kernelRadius);
+            shaderSample.SetFloat("_inv_KernelRadius", (float)sphSolver.kernelRadius);
+            shaderSample.SetFloat("_kr2", (float)sphSolver.kr2);
+            shaderSample.SetFloat("_inv_kr3", (float)sphSolver.inv_kr3);
+            shaderSample.SetFloat("_inv_kr6", (float)sphSolver.inv_kr6);
+            shaderSample.SetFloat("_inv_kr9", (float)sphSolver.inv_kr9);
         }
        
         /// <summary>
@@ -203,6 +231,18 @@ namespace SPHFluid.Render
                 _bufferCornerToVertTable.Release();
                 _bufferCornerToVertTable = null;
             }
+
+            if (_bufferParticles != null)
+            {
+                _bufferParticles.Release();
+                _bufferParticles = null;
+            }
+
+            if(_bufferParticlesStartIndex != null)
+            {
+                _bufferParticlesStartIndex.Release();
+                _bufferParticlesStartIndex = null;
+            }
         }   
 
         /// <summary>
@@ -218,42 +258,84 @@ namespace SPHFluid.Render
             int ag1BlockSize = blockSize + 1;
 
             //the array that hold samples in order to send them to GPU
-            float[] samples = new float[nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize)];
-            Vector3[] sampleNormals = new Vector3[nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize)];
-            for (int blockNum = 0; blockNum < nextUpdateblocks.Count; blockNum++)
-            {
-                var blockIdx = nextUpdateblocks[blockNum];
-                int x = blockIdx._x; int y = blockIdx._y; int z = blockIdx._z;
-                for (int ix = 0; ix < ag1BlockSize; ix++)
-                    for (int iy = 0; iy < ag1BlockSize; iy++)
-                        for (int iz = 0; iz < ag1BlockSize; iz++)
+            //float[] samples = new float[nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize)];
+            //Vector3[] sampleNormals = new Vector3[nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize)];
+            //for (int blockNum = 0; blockNum < nextUpdateblocks.Count; blockNum++)
+            //{
+            //    var blockIdx = nextUpdateblocks[blockNum];
+            //    int x = blockIdx._x; int y = blockIdx._y; int z = blockIdx._z;
+            //    for (int ix = 0; ix < ag1BlockSize; ix++)
+            //        for (int iy = 0; iy < ag1BlockSize; iy++)
+            //            for (int iz = 0; iz < ag1BlockSize; iz++)
+            //            {
+            //                var queryX = x * blockSize + ix;
+            //                var queryY = y * blockSize + iy;
+            //                var queryZ = z * blockSize + iz;
+
+            //                float value; Vector3 normal;
+            //                implicitSurface(queryX, queryY, queryZ, out value, out normal);
+            //                int idx = ix +
+            //                    iy * (ag1BlockSize) +
+            //                    iz * (ag1BlockSize) * (ag1BlockSize) +
+            //                    blockNum * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize);
+
+            //                //store value
+            //                samples[idx] = value;
+            //                sampleNormals[idx] = normal;
+            //            }
+            //}
+            //#if UNITY_EDITOR
+            //            float startTime = Time.realtimeSinceStartup;
+            //#endif
+
+            //ComputeBuffer bufferSamples = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float));
+            //bufferSamples.SetData(samples);
+
+            //ComputeBuffer bufferNormals = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float) * 3);
+            //bufferNormals.SetData(sampleNormals);
+
+            //GPU sampling attempt #0
+            ComputeBuffer bufferBlocks = new ComputeBuffer(nextUpdateblocks.Count, sizeof(int) * 3);
+            bufferBlocks.SetData(nextUpdateblocks.ToArray());
+
+            
+            List<CSParticle> particlesCopy = new List<CSParticle>();            
+            
+            int[] particlesStartIdx = new int[sphSolver.gridCountXYZ + 1];
+
+            int startIdx = 0;
+            for (int x = 0; x < sphSolver.gridSize._x; ++x)
+                for (int y = 0; y < sphSolver.gridSize._y; ++y)
+                    for (int z = 0; z < sphSolver.gridSize._z; ++z)
+                    {
+                        int idx = x * sphSolver.gridCountYZ + y * sphSolver.gridSize._z + z;
+                        foreach (var particle in sphSolver.grid[idx].particles)
                         {
-                            var queryX = x * blockSize + ix;
-                            var queryY = y * blockSize + iy;
-                            var queryZ = z * blockSize + iz;
-
-                            float value; Vector3 normal;
-                            implicitSurface(queryX, queryY, queryZ, out value, out normal);
-                            int idx = ix +
-                                iy * (ag1BlockSize) +
-                                iz * (ag1BlockSize) * (ag1BlockSize) +
-                                blockNum * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize);
-
-                            //store value
-                            samples[idx] = value;
-                            sampleNormals[idx] = normal;
+                            particlesCopy.Add(new CSParticle((float)particle.mass, 1f / (float)particle.density,
+                                new Vector3((float)particle.position.x, (float)particle.position.y, (float)particle.position.z)));
                         }
-            }
-//#if UNITY_EDITOR
-//            float startTime = Time.realtimeSinceStartup;
-//#endif
-            ////rebuild normals
-            ComputeBuffer bufferSamples = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float));
-            bufferSamples.SetData(samples);
+                        particlesStartIdx[idx] = startIdx;
+                        startIdx += sphSolver.grid[idx].particles.Count;
+                    }
+            particlesStartIdx[particlesStartIdx.Length - 1] = sphSolver.currParticleNum;
 
+            _bufferParticlesStartIndex.SetData(particlesStartIdx);
+            _bufferParticles.SetData(particlesCopy.ToArray());
+
+            ComputeBuffer bufferSamples = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float));
             ComputeBuffer bufferNormals = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float) * 3);
-            bufferNormals.SetData(sampleNormals);
-          
+
+            shaderSample.SetBuffer(sampleKernel, "_Blocks", bufferBlocks);
+            shaderSample.SetBuffer(sampleKernel, "_ParticleStartIndexPerCell", _bufferParticlesStartIndex);
+            shaderSample.SetBuffer(sampleKernel, "_Particles", _bufferParticles);
+            shaderSample.SetBuffer(sampleKernel, "_Samples", bufferSamples);
+            shaderSample.SetBuffer(sampleKernel, "_Normals", bufferNormals);
+
+            shaderSample.Dispatch(sampleKernel, nextUpdateblocks.Count, 1, 1);
+
+            bufferBlocks.Release();
+            bufferBlocks = null;
+
             //marching-cube
 
             //STAGE I: collect triangle number
@@ -273,6 +355,7 @@ namespace SPHFluid.Render
             if(triNum[0] == 0)
             {
                 //no triangles, early exit
+                
                 bufferNormals.Release();
                 bufferSamples.Release();
 

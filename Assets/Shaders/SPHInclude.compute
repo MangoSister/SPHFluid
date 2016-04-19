@@ -42,6 +42,7 @@ static int3 neighborOffset[27] =
 	int3(-1,1,1), int3(0,1,1), int3(1,1,1), 
 };
 
+//Please set these vars!!!!!!!!!!!!!
 uniform uint3 _SphGridSize;
 uniform float _KernelRadius;
 uniform float _inv_KernelRadius;
