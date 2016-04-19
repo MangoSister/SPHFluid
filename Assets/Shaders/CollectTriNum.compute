@@ -1,10 +1,5 @@
+#include "SPHInclude.compute"
 #pragma kernel CollectTriNum
-
-#define BLOCK_SIZE 8
-#define SAMPLE_SIZE 9
-#define INC_SAMPLE_SIZE 10
-#define INC_SAMPLE_SIZE_2D 100
-#define INC_SAMPLE_SIZE_3D 1000
 
 StructuredBuffer<float> _Samples;
 StructuredBuffer<int> _CornerToTriNumTable;
@@ -14,19 +9,19 @@ RWBuffer<uint> _CornerFlags;
 
 void FillCube(int blockIdx, uint3 cellIdx, out float cube[8])
 {
-	uint start = blockIdx * INC_SAMPLE_SIZE_3D + cellIdx.x + cellIdx.y * INC_SAMPLE_SIZE + cellIdx.z * INC_SAMPLE_SIZE * INC_SAMPLE_SIZE;
+	uint start = blockIdx * SAMPLE_SIZE_3D + cellIdx.x + cellIdx.y * SAMPLE_SIZE + cellIdx.z * SAMPLE_SIZE_2D;
 
 	//low
 	cube[0] = _Samples[start];
 	cube[1] = _Samples[start + 1];
-	cube[2] = _Samples[start + 1 + INC_SAMPLE_SIZE];
-	cube[3] = _Samples[start + INC_SAMPLE_SIZE];
+	cube[2] = _Samples[start + 1 + SAMPLE_SIZE];
+	cube[3] = _Samples[start + SAMPLE_SIZE];
 
 	//up
-	cube[4] = _Samples[start + INC_SAMPLE_SIZE*INC_SAMPLE_SIZE];
-	cube[5] = _Samples[start + 1 + INC_SAMPLE_SIZE*INC_SAMPLE_SIZE];
-	cube[6] = _Samples[start + 1 + INC_SAMPLE_SIZE + INC_SAMPLE_SIZE*INC_SAMPLE_SIZE];
-	cube[7] = _Samples[start + INC_SAMPLE_SIZE + INC_SAMPLE_SIZE*INC_SAMPLE_SIZE];
+	cube[4] = _Samples[start + SAMPLE_SIZE_2D];
+	cube[5] = _Samples[start + 1 + SAMPLE_SIZE_2D];
+	cube[6] = _Samples[start + 1 + SAMPLE_SIZE + SAMPLE_SIZE_2D];
+	cube[7] = _Samples[start + SAMPLE_SIZE + SAMPLE_SIZE_2D];
 }
 
 
@@ -47,10 +42,10 @@ void CollectTriNum (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 
 	_CornerFlags
 	[
-		blockIdx * BLOCK_SIZE*BLOCK_SIZE*BLOCK_SIZE +
+		blockIdx * BLOCK_SIZE_3D +
 		cellIdx.x +
 		cellIdx.y * BLOCK_SIZE +
-		cellIdx.z * BLOCK_SIZE * BLOCK_SIZE
+		cellIdx.z * BLOCK_SIZE_2D
 	] = cornerFlag;
 
 }

@@ -1,0 +1,124 @@
+#ifndef SPH_INCLUDE
+#define SPH_INCLUDE
+
+#define BLOCK_SIZE 8
+#define BLOCK_SIZE_2D 64
+#define BLOCK_SIZE_3D 512
+#define SAMPLE_SIZE 9
+#define SAMPLE_SIZE_2D 81
+#define SAMPLE_SIZE_3D 729
+
+struct Triangle
+{
+	float3 _position0;
+	float3 _position1;
+	float3 _position2;
+	float3 _normal0;
+	float3 _normal1;
+	float3 _normal2;
+	int _block;
+};
+
+struct Particle
+{
+	double _mass;
+	double _density;
+	double3 _position;
+};
+
+//(x+1) + 3(y+1) + 9(z+1)
+static int3 neighborOffset[27] =
+{
+	int3(-1,-1,-1), int3(0,-1,-1), int3(1,-1,-1), 
+	int3(-1,0,-1), int3(0,0,-1), int3(1,0,-1), 
+	int3(-1,1,-1), int3(0,1,-1), int3(1,1,-1), 
+
+	int3(-1,-1,0), int3(0,-1,0), int3(1,-1,0), 
+	int3(-1,0,0), int3(0,0,0), int3(1,0,0), 
+	int3(-1,1,0), int3(0,1,0), int3(1,1,0), 
+
+	int3(-1,-1,1), int3(0,-1,1), int3(1,-1,1), 
+	int3(-1,0,1), int3(0,0,1), int3(1,0,1), 
+	int3(-1,1,1), int3(0,1,1), int3(1,1,1), 
+};
+
+uniform uint3 _SphGridSize;
+uniform double _inv_KernelRadius;
+
+void FindNeighborSpace(uint3 idx, out bool neighbor[27])
+{
+	 //x + 3y + 9z
+	 if (idx.x > 0) // (0, 1, 1) -> 12
+		neighbor[12] = true;
+     if (idx.y > 0) // (1, 0, 1) ->10
+		neighbor[10] = true;
+     if (idx.z > 0) // (1, 1, 0) -> 4
+        neighbor[4] = true;
+
+     if (idx.x < _SphGridSize.x - 1) // (2, 1, 1) -> 14
+        neighbor[14] = true;
+     if (idx.y < _SphGridSize.y - 1) // (1, 2, 1) -> 16
+        neighbor[16] = true;
+     if (idx.z < _SphGridSize.z - 1) // (1, 1, 2) -> 22
+        neighbor[22] = true;
+
+     if (idx.x > 0 && idx.y > 0) // (0, 0, 1) -> 9
+        neighbor[9] = true;
+     if (idx.y > 0 && idx.z > 0) // (1, 0, 0) -> 1
+        neighbor[1] = true;
+     if (idx.x > 0 && idx.z > 0) // (0, 1, 0) -> 3
+        neighbor[3] = true;
+
+     if (idx.x < _SphGridSize.x - 1 && idx.y < _SphGridSize.y - 1) // (2, 2, 1) -> 17
+        neighbor[17] = true;
+     if (idx.y < _SphGridSize.y - 1 && idx.z < _SphGridSize.z - 1) // (1, 2, 2) -> 25
+        neighbor[25] = true;
+     if (idx.x < _SphGridSize.x - 1 && idx.z < _SphGridSize.z - 1) // (2, 1, 2) -> 23
+        neighbor[23] = true;
+
+     if (idx.x > 0 && idx.y < _SphGridSize.y - 1) // (0, 2, 1) -> 15
+        neighbor[15] = true;
+     if (idx.y > 0 && idx.z < _SphGridSize.z - 1) // (1, 0, 2) -> 19
+        neighbor[19] = true;
+     if (idx.x > 0 && idx.z < _SphGridSize.z - 1) // (0, 1, 2) -> 21
+        neighbor[21] = true;
+
+     if (idx.x < _SphGridSize.x - 1 && idx.y > 0) // (2, 0, 1) -> 11
+        neighbor[11] = true;
+     if (idx.y < _SphGridSize.y - 1 && idx.z > 0) // (1, 2, 0) -> 7
+        neighbor[7] = true;
+     if (idx.x < _SphGridSize.x - 1 && idx.z > 0) // (2, 1, 0) -> 5
+        neighbor[5] = true;
+
+     if (idx.x > 0 && idx.y > 0 && idx.z > 0) // (0, 0, 0) -> 0
+         neighbor[0] = true;
+
+     if (idx.x < _SphGridSize.x - 1 && idx.y > 0 && idx.z > 0) // (2, 0, 0) -> 2
+        neighbor[2] = true;
+     if (idx.x > 0 && idx.y < _SphGridSize.y - 1 && idx.z > 0) // (0, 2, 0) -> 6
+        neighbor[6] = true;
+     if (idx.x > 0 && idx.y > 0 && idx.z < _SphGridSize.z - 1) // (0, 0, 2) -> 18
+        neighbor[18] = true;
+
+     if (idx.x < _SphGridSize.x - 1 && idx.y < _SphGridSize.y - 1 && idx.z > 0) // (2, 2, 0) -> 8
+         neighbor[8] = true;
+     if (idx.x > 0 && idx.y < _SphGridSize.y - 1 && idx.z < _SphGridSize.z - 1) // (0, 2, 2) -> 24
+         neighbor[24] = true;
+     if (idx.x < _SphGridSize.x - 1 && idx.y > 0 && idx.z < _SphGridSize.z - 1) // (2, 0, 2) -> 20
+         neighbor[20] = true;
+
+     if (idx.x < _SphGridSize.x - 1 && idx.y < _SphGridSize.y - 1 && idx.z < _SphGridSize.z - 1) // (2, 2, 2) -> 26
+         neighbor[26] = true;
+}
+
+double KernelPoly6(double3 r)
+{
+	return 0;
+}
+
+double3 GradKernelPoly6(double3 r)
+{
+	return double3(0, 0, 0);
+}
+
+#endif

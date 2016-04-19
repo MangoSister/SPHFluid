@@ -39,7 +39,7 @@ namespace SPHFluid.Render
         public int width = 16, height = 16, length = 16; // voxel size
         // The samples of the terrain density function
         //public float[, ,] voxelSamples;
-        public delegate float ImplicitSurface(int x, int y, int z); //(x,y,z) : voxel index
+        public delegate void ImplicitSurface(int x, int y, int z, out float value, out Vector3 normal); //(x,y,z) : voxel index
         public ImplicitSurface implicitSurface;
 
         // The size of _voxelSamples should not exceed [1025,1025,1025]
@@ -216,42 +216,44 @@ namespace SPHFluid.Render
             //In order to also recompute the normals of vertices, we need to also sample "one more layer" in adjacent cells
             //"argumented block size"
             int ag1BlockSize = blockSize + 1;
-            int ag2BlockSize = blockSize + 2;
 
             //the array that hold samples in order to send them to GPU
-            float[] samples = new float[nextUpdateblocks.Count * (ag2BlockSize) * (ag2BlockSize) * (ag2BlockSize)];
+            float[] samples = new float[nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize)];
+            Vector3[] sampleNormals = new Vector3[nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize)];
             for (int blockNum = 0; blockNum < nextUpdateblocks.Count; blockNum++)
             {
                 var blockIdx = nextUpdateblocks[blockNum];
                 int x = blockIdx._x; int y = blockIdx._y; int z = blockIdx._z;
-                for (int ix = 0; ix < ag2BlockSize; ix++)
-                    for (int iy = 0; iy < ag2BlockSize; iy++)
-                        for (int iz = 0; iz < ag2BlockSize; iz++)
+                for (int ix = 0; ix < ag1BlockSize; ix++)
+                    for (int iy = 0; iy < ag1BlockSize; iy++)
+                        for (int iz = 0; iz < ag1BlockSize; iz++)
                         {
                             var queryX = x * blockSize + ix;
                             var queryY = y * blockSize + iy;
                             var queryZ = z * blockSize + iz;
 
+                            float value; Vector3 normal;
+                            implicitSurface(queryX, queryY, queryZ, out value, out normal);
+                            int idx = ix +
+                                iy * (ag1BlockSize) +
+                                iz * (ag1BlockSize) * (ag1BlockSize) +
+                                blockNum * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize);
+
                             //store value
-                            samples[ix +
-                                iy * (ag2BlockSize) +
-                                iz * (ag2BlockSize) * (ag2BlockSize) +
-                                blockNum * (ag2BlockSize) * (ag2BlockSize) * (ag2BlockSize)]
-                                = implicitSurface(queryX, queryY, queryZ);
+                            samples[idx] = value;
+                            sampleNormals[idx] = normal;
                         }
             }
 //#if UNITY_EDITOR
 //            float startTime = Time.realtimeSinceStartup;
 //#endif
             ////rebuild normals
-            ComputeBuffer bufferSamples = new ComputeBuffer(nextUpdateblocks.Count * (ag2BlockSize) * (ag2BlockSize) * (ag2BlockSize), sizeof(float));
+            ComputeBuffer bufferSamples = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float));
             bufferSamples.SetData(samples);
             shaderNormal.SetBuffer(nrmKernel, "_Samples", bufferSamples);
 
             ComputeBuffer bufferNormals = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float) * 3);
-            shaderNormal.SetBuffer(nrmKernel, "_Normals", bufferNormals);
-            //dispatch compute shader
-            shaderNormal.Dispatch(nrmKernel, nextUpdateblocks.Count, 1, 1);
+            bufferNormals.SetData(sampleNormals);
 
             //marching-cube
 
@@ -295,7 +297,7 @@ namespace SPHFluid.Render
             shaderMarchingCube.SetBuffer(mcKernel, "_TriEndIndex", bufferTriEndIndex);
             //dispatch compute shader
             shaderMarchingCube.Dispatch(mcKernel, nextUpdateblocks.Count, 1, 1);
-
+       
             //split bufferMeshes to meshes for individual blocks
             CSTriangle[] csTriangles = new CSTriangle[triNum[0]];//triNum[0] is the counter
             bufferMeshes.GetData(csTriangles);

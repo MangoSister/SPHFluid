@@ -103,10 +103,10 @@ namespace SPHFluid
         {
             while (true)
             {
-                //yield return new WaitForSeconds(updateInterval);
-                yield return null;
-                if (!Input.GetKeyDown(KeyCode.S))
-                    continue;
+                yield return new WaitForSeconds(updateInterval);
+                //yield return null;
+                //if (!Input.GetKeyDown(KeyCode.S))
+                //    continue;
 
 #if UNITY_EDITOR
                 float startTime = Time.realtimeSinceStartup;
@@ -133,10 +133,8 @@ namespace SPHFluid
             }
         }
 
-        private float SampleFluidSurfaceVoxel(int x, int y, int z)
+        private void SampleFluidSurfaceVoxel(int x, int y, int z, out float value, out Vector3 normal)
         {
-            double value;
-            Vector3d normal;
             Vector3d pos = new Vector3d(x, y, z) * mcEngine.engineScale;
             if (pos.x >= gridSize._x * kernelRadius)
                 pos.x = gridSize._x - MathHelper.Eps;
@@ -144,8 +142,9 @@ namespace SPHFluid
                 pos.y = gridSize._y - MathHelper.Eps;
             if (pos.z >= gridSize._z * kernelRadius)
                 pos.z = gridSize._z - MathHelper.Eps;
-            sphSolver.SampleSurface(pos, out value, out normal);
-            return (float)value;
+            double val; Vector3d nrm;
+            sphSolver.SampleSurface(pos, out val, out nrm);
+            value = (float)val; normal = new Vector3((float)nrm.x, (float)nrm.y, (float)nrm.z);
         }
 
 #if UNITY_EDITOR
