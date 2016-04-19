@@ -55,8 +55,8 @@ namespace SPHFluid.Render
         public int width = 16, height = 16, length = 16; // voxel size
         // The samples of the terrain density function
         //public float[, ,] voxelSamples;
-        public delegate void ImplicitSurface(int x, int y, int z, out float value, out Vector3 normal); //(x,y,z) : voxel index
-        public ImplicitSurface implicitSurface;
+        //public delegate void ImplicitSurface(int x, int y, int z, out float value, out Vector3 normal); //(x,y,z) : voxel index
+        //public ImplicitSurface implicitSurface;
 
         // The size of _voxelSamples should not exceed [1025,1025,1025]
         public const int maxSampleResolution = 1025; //sample size = voxel size + 1   
@@ -171,7 +171,7 @@ namespace SPHFluid.Render
                         _blocks[x, y, z].layer = voxelTerrainLayer;
                         _blocks[x, y, z].AddComponent<MeshFilter>();
                         _blocks[x, y, z].AddComponent<MeshRenderer>();
-                        _blocks[x, y, z].AddComponent<MeshCollider>();
+                        //_blocks[x, y, z].AddComponent<MeshCollider>();
 
                         _blocks[x, y, z].transform.parent = this.engineTransform;
                         var pos = new Vector3(x, y, z) * (float)blockSize * engineScale;
@@ -190,6 +190,8 @@ namespace SPHFluid.Render
             shaderSample.SetFloat("_inv_kr3", (float)sphSolver.inv_kr3);
             shaderSample.SetFloat("_inv_kr6", (float)sphSolver.inv_kr6);
             shaderSample.SetFloat("_inv_kr9", (float)sphSolver.inv_kr9);
+            shaderSample.SetFloat("_SurfaceThreshold", (float)sphSolver.surfaceThreshold);
+            shaderSample.SetFloat("_MCVoxelScale", engineScale);
         }
        
         /// <summary>
@@ -207,8 +209,8 @@ namespace SPHFluid.Render
                                 continue;
                             if (_blocks[x, y, z].GetComponent<MeshFilter>().mesh != null)
                                 _blocks[x, y, z].GetComponent<MeshFilter>().mesh.Clear();
-                            if (_blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh != null)
-                                _blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh.Clear();
+                            //if (_blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh != null)
+                             //   _blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh.Clear();
                             Destroy(_blocks[x, y, z]);
                             _blocks[x, y, z] = null;
                         }
@@ -250,6 +252,18 @@ namespace SPHFluid.Render
         /// </summary>
         public void BatchUpdate(List<Int3> nextUpdateblocks)
         {
+            for (int x = 0; x < width / blockSize; x++)
+                for (int y = 0; y < height / blockSize; y++)
+                    for (int z = 0; z < length / blockSize; z++)
+                    {
+                        if (_blocks[x, y, z] == null)
+                            continue;
+                        if (_blocks[x, y, z].GetComponent<MeshFilter>().mesh != null)
+                            _blocks[x, y, z].GetComponent<MeshFilter>().mesh.Clear();
+                        //if (_blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh != null)
+                        //    _blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh.Clear();
+                    }
+
             if (nextUpdateblocks.Count == 0)
                 return;
 
@@ -294,7 +308,7 @@ namespace SPHFluid.Render
             //ComputeBuffer bufferNormals = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float) * 3);
             //bufferNormals.SetData(sampleNormals);
 
-            //GPU sampling attempt #0
+            //GPU sampling attempt #0  
             ComputeBuffer bufferBlocks = new ComputeBuffer(nextUpdateblocks.Count, sizeof(int) * 3);
             bufferBlocks.SetData(nextUpdateblocks.ToArray());
 
@@ -335,6 +349,9 @@ namespace SPHFluid.Render
 
             bufferBlocks.Release();
             bufferBlocks = null;
+
+            float[] s = new float[nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize)];
+            bufferSamples.GetData(s);
 
             //marching-cube
 
@@ -419,7 +436,7 @@ namespace SPHFluid.Render
                 mesh.RecalculateBounds();
                 _blocks[x, y, z].GetComponent<MeshFilter>().mesh = mesh;
                 _blocks[x, y, z].GetComponent<MeshRenderer>().material = material;
-                _blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh = mesh;
+                //_blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh = mesh;
             }
 
             //Debug.Log("Time taken: " + (Time.realtimeSinceStartup - startTime) * 1000.0f);

@@ -513,8 +513,6 @@ namespace SPHFluid
             value = 0;
             normal = Vector3d.zero;
             List<Int3> neighborSpace = FindNeighborSpace(FindCellIdx(pos));
-            //if (neighborSpace == null)
-            //    Debug.Log(pos);
             for (int n = 0; n < neighborSpace.Count; ++n)
             {
                 SPHGridCell cell = grid[neighborSpace[n]._x * gridCountYZ +

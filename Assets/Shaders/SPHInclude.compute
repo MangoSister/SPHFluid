@@ -50,20 +50,25 @@ uniform float _kr2;
 uniform float _inv_kr3;
 uniform float _inv_kr6;
 uniform float _inv_kr9;
+uniform float _SurfaceThreshold;
+uniform float _MCVoxelScale;
 
-const float kPoly6Const = 1.566681471061;
-const float gradKPoly6Const = -9.4000888264;
-const float lapKPoly6Const = -9.4000888264;
-const float kSpikyConst = 4.774648292757;
-const float gradKSpikyConst = -14.3239448783;
-const float kViscosityConst = 2.387324146378;
-const float lapkViscosityConst = 14.3239448783;
+#define kPoly6Const (1.566681471061)
+#define gradKPoly6Const (-9.4000888264)
+#define lapKPoly6Const (-9.4000888264)
+#define kSpikyConst (4.774648292757)
+#define gradKSpikyConst (-14.3239448783)
+#define kViscosityConst (2.387324146378)
+#define lapkViscosityConst (14.3239448783)
 
 void FindNeighborSpace(uint3 idx, out bool neighbor[27])
 {
 	for(uint p = 0; p < 27; ++p)
-	neighbor[p] = false;
+		neighbor[p] = false;
 	 //x + 3y + 9z
+
+	 neighbor[13] = true;
+
 	 if (idx.x > 0) // (0, 1, 1) -> 12
 		neighbor[12] = true;
 	 if (idx.y > 0) // (1, 0, 1) ->10

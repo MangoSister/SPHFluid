@@ -26,7 +26,7 @@ void SampleFluid  (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 	 (float)(_Blocks[blockIdx].y * BLOCK_SIZE + cellIdx.y),
 	 (float)(_Blocks[blockIdx].z * BLOCK_SIZE + cellIdx.z));
 
-	worldPos *= _inv_KernelRadius;
+	worldPos *= _inv_KernelRadius * _MCVoxelScale;
 	uint3 cellWorldIdx = floor(worldPos);
 	
 	//find neighbor space
@@ -45,7 +45,7 @@ void SampleFluid  (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 								 neighborIdx.y * _SphGridSize.z + 
 								 neighborIdx.z;
 			uint start = _ParticleStartIndexPerCell[neighborIdx1d];
-			uint end = _ParticleStartIndexPerCell[neighborIdx1d + 1]; //bug: last element? -> one more element
+			uint end = _ParticleStartIndexPerCell[neighborIdx1d + 1]; //last element? -> one more element
 			for(uint n = start; n < end; ++n)
 			{
 				_Samples[outputIdx] += _Particles[n]._mass * _Particles[n]._inv_density * KernelPoly6(worldPos - _Particles[n]._position);
@@ -53,4 +53,13 @@ void SampleFluid  (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 			}
 		}
 	}
+	
+	if (_Samples[outputIdx] > 0)
+    {
+		_Samples[outputIdx] -= _SurfaceThreshold;
+		_Normals[outputIdx] = normalize(_Normals[outputIdx]);
+        _Normals[outputIdx] *= -1;
+    }
+     else
+		_Samples[outputIdx] = -_SurfaceThreshold;
 }

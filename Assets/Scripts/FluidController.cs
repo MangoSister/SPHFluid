@@ -41,7 +41,6 @@ namespace SPHFluid
             sphSolver.Init();
 
             mcEngine.engineScale = (float)gridSize._x / (float)mcEngine.width;
-            mcEngine.implicitSurface = SampleFluidSurfaceVoxel;
             mcEngine.Init(sphSolver);
 
             StartCoroutine(Simulate_CR());
@@ -77,30 +76,9 @@ namespace SPHFluid
                 sphSolver.CreateParticle(1, new Vector3d(5 + 0.1 * x, 4.9, 5), new Vector3d(5,0,0));
         }
 
-        //private void ExampleMc()
-        //{
-        //    List<Int3> list = new List<Int3>()
-        //    {
-        //        new Int3(0,0,0 ),
-        //        new Int3(0,0,1 ),
-        //        new Int3(0,1,0 ),
-        //        new Int3(0,1,1 ),
-        //        new Int3(1,0,0 ),
-        //        new Int3(1,0,1 ),
-        //        new Int3(1,1,0 ),
-        //        new Int3(1,1,1 ),
-        //    };
-
-        //    for (int ix = 0; ix < mcEngine.width + 2; ix++)
-        //        for (int iy = 0; iy < mcEngine.height + 2; iy++)
-        //            for (int iz = 0; iz < mcEngine.length + 2; iz++)
-        //                mcEngine.voxelSamples[ix, iy, iz] = -(new Vector3(ix, iy, iz) - Vector3.one * 8f).sqrMagnitude + 64f;
-
-        //    mcEngine.BatchUpdate(list);
-        //}
-
         private IEnumerator Simulate_CR()
         {
+            HashSet<Int3> currUpdateMCBlocks = new HashSet<Int3>(); 
             while (true)
             {
                 yield return new WaitForSeconds(updateInterval);
@@ -108,43 +86,27 @@ namespace SPHFluid
                 //if (!Input.GetKeyDown(KeyCode.S))
                 //    continue;
 
-#if UNITY_EDITOR
-                float startTime = Time.realtimeSinceStartup;
-#endif
-
+//#if UNITY_EDITOR
+//                float startTime = Time.realtimeSinceStartup;
+//#endif
                 sphSolver.Step();
-
                 //update MarchingCubeEngine
-                HashSet<Int3> updateMCBlocks = new HashSet<Int3>();
+                currUpdateMCBlocks.Clear();
                 for (int i = 0; i < sphSolver.currParticleNum; ++i)
                 {                
                     if (sphSolver.allParticles[i].onSurface)
                     {
                         Vector3d blockOffset = (sphSolver.allParticles[i].position /*- mcEngine.engineOrigin*/) / 
                                                 (mcEngine.engineScale * MarchingCubeEngine.blockSize);
-                        updateMCBlocks.Add(Vector3d.FloorToInt3(blockOffset));
+                        currUpdateMCBlocks.Add(Vector3d.FloorToInt3(blockOffset));
                     }
                 }
 
-#if UNITY_EDITOR
-                print("Time taken: " + (Time.realtimeSinceStartup - startTime) * 1000.0f);
-#endif
-                mcEngine.BatchUpdate(new List<Int3>(updateMCBlocks));
+                //#if UNITY_EDITOR
+                //                print("Time taken: " + (Time.realtimeSinceStartup - startTime) * 1000.0f);
+                //#endif
+                mcEngine.BatchUpdate(new List<Int3>(currUpdateMCBlocks));
             }
-        }
-
-        private void SampleFluidSurfaceVoxel(int x, int y, int z, out float value, out Vector3 normal)
-        {
-            Vector3d pos = new Vector3d(x, y, z) * mcEngine.engineScale;
-            if (pos.x >= gridSize._x * kernelRadius)
-                pos.x = gridSize._x - MathHelper.Eps;
-            if (pos.y >= gridSize._y * kernelRadius)
-                pos.y = gridSize._y - MathHelper.Eps;
-            if (pos.z >= gridSize._z * kernelRadius)
-                pos.z = gridSize._z - MathHelper.Eps;
-            double val; Vector3d nrm;
-            sphSolver.SampleSurface(pos, out val, out nrm);
-            value = (float)val; normal = new Vector3((float)nrm.x, (float)nrm.y, (float)nrm.z);
         }
 
 #if UNITY_EDITOR
