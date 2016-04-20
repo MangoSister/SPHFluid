@@ -488,7 +488,6 @@ namespace SPHFluid
                 acc += externalAcc;
                 //leap frog integration
                 curr.position = curr.position + curr.velocity * timeStep;
-                curr.midVelocity = curr.velocity;
                 curr.prevVelocity = curr.velocity;
                 curr.velocity = curr.velocity + acc * timeStep;
                 curr.midVelocity = 0.5 * (curr.velocity + curr.midVelocity);

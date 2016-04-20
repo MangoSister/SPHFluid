@@ -59,6 +59,7 @@ static int3 neighborOffset[27] =
 
 //SPH solver params -- SET ME!!!!!
 uniform uint _ParticleNum;
+uniform float _TimeStep;
 uniform uint3 _SphGridSize;
 uniform float _KernelRadius;
 
@@ -90,10 +91,10 @@ uniform float _MCVoxelScale;
 
 void FindNeighborSpace(uint3 idx, out bool neighbor[27])
 {
-	for(uint p = 0; p < 27; ++p)
-		neighbor[p] = false;
+	//for(uint p = 0; p < 27; ++p)
+	//	neighbor[p] = false;
+	 
 	 //x + 3y + 9z
-
 	 neighbor[13] = true;
 
 	 if (idx.x > 0) // (0, 1, 1) -> 12
@@ -164,7 +165,7 @@ void FindNeighborSpace(uint3 idx, out bool neighbor[27])
          neighbor[26] = true;
 }
 
-float KernelPoly6(float3 r)
+inline float KernelPoly6(float3 r)
 {
 	float sqrDiff = (_kr2 - dot(r, r));
     if (sqrDiff < 0)
@@ -172,7 +173,7 @@ float KernelPoly6(float3 r)
     return kPoly6Const * _inv_kr9 * sqrDiff * sqrDiff * sqrDiff;
 }
 
-float3 GradKernelPoly6(float3 r)
+inline float3 GradKernelPoly6(float3 r)
 {
 	float sqrDiff = (_kr2 - dot(r,r));
     if (sqrDiff < 0)
@@ -180,7 +181,7 @@ float3 GradKernelPoly6(float3 r)
 	return gradKPoly6Const * _inv_kr9 * sqrDiff * sqrDiff * r;
 }
 
-float LaplacianKernelPoly6(float3 r)
+inline float LaplacianKernelPoly6(float3 r)
 {
 	float r2 = dot(r, r);
 	float sqrDiff = (_kr2 - r2);
@@ -189,7 +190,7 @@ float LaplacianKernelPoly6(float3 r)
     return lapKPoly6Const * _inv_kr9 * sqrDiff * (3 * _kr2 - 7 * r2);
 }
 
-float KernelSpiky(float3 r)
+inline float KernelSpiky(float3 r)
 {
 	float diff = _KernelRadius - length(r);
     if (diff < 0)
@@ -197,7 +198,7 @@ float KernelSpiky(float3 r)
     return kSpikyConst * _inv_kr6 * diff * diff * diff;
 }
 
-float3 GradKernelSpiky(float3 r)
+inline float3 GradKernelSpiky(float3 r)
 {
     float mag = length(r);
     float diff = (_KernelRadius - mag);
@@ -207,7 +208,7 @@ float3 GradKernelSpiky(float3 r)
     return gradKSpikyConst * _inv_kr6 * diff * diff * r;
 }
 
-float KernelViscosity(float3 r)
+inline float KernelViscosity(float3 r)
 {
     float mag = length(r);
     if (_KernelRadius - mag < 0)
@@ -216,13 +217,18 @@ float KernelViscosity(float3 r)
     return kViscosityConst * _inv_kr3 * (-0.5 * mag * sqrMag * _inv_kr3 + sqrMag / (_kr2) + 0.5 * _KernelRadius / mag - 1);
 }
 
-float LaplacianKernelViscosity(float3 r)
+inline float LaplacianKernelViscosity(float3 r)
 {
 	float mag = length(r);
     float diff = _KernelRadius - mag;
     if (diff < 0 || mag <= 0)
         return 0;
     return lapkViscosityConst * _inv_kr6 * diff;
+}
+
+inline void ApplyGridBoundaryCondition(inout Particle particle)
+{
+	
 }
 
 #endif
