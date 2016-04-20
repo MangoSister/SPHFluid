@@ -10,6 +10,7 @@
 StructuredBuffer<uint> _ParticleStartIndexPerCell;
 
 //Updating
+RWStructuredBuffer<uint> _ParticleNumPerCell;
 RWStructuredBuffer<Particle> _Particles;
 RWStructuredBuffer<bool> _NeighborSpace;
 
@@ -22,6 +23,11 @@ void FindNeighborSpace (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID
 		return;
 
 	uint3 cellIdx = floor(_Particles[flatIdx]._position * _inv_KernelRadius);
+	uint cellIdx1d = cellIdx.x * _SphGridSize.y * _SphGridSize.z +
+					 cellIdx.y * _SphGridSize.z + 
+					 cellIdx.z;
+	_ParticleNumPerCell[cellIdx1d]++;
+	
 	bool neighbor[27];
 	FindNeighborSpace(cellIdx, neighbor);
 
