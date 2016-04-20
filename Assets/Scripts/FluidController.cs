@@ -37,13 +37,17 @@ namespace SPHFluid
             //CreateTest25Square();
             //CreateDirFlow();
             CreateTest125Cube();
+            //CreateTest1000Cube();
+            //CreateTwoCollisionFlow();
+            //CreatePenetrateWall();
 
             sphSolver.Init();
 
             mcEngine.engineScale = (float)gridSize._x / (float)mcEngine.width;
             mcEngine.Init(sphSolver);
 
-            StartCoroutine(Simulate_CR());
+            if (sphSolver.currParticleNum > 0)
+                StartCoroutine(Simulate_CR());
         }
 
         private void OnDestroy()
@@ -51,6 +55,7 @@ namespace SPHFluid
             mcEngine.Free();
         }
 
+        #region Test Cases
         private void CreateTest25Square()
         {
             for (int x = 0; x < 5; ++x)
@@ -70,11 +75,43 @@ namespace SPHFluid
                     }
         }
 
+        private void CreateTest1000Cube()
+        {
+            for (int x = 0; x < 10; ++x)
+                for (int y = 0; y < 10; ++y)
+                    for (int z = 0; z < 10; ++z)
+                    {
+                        sphSolver.CreateParticle(1, new Vector3d(4 + 0.2 * x, 4 + 0.2 * y, 4 + 0.2 * z), Vector3d.zero);
+                    }
+        }
+
+
         private void CreateDirFlow()
         {
             for (int x = 0; x < 20; ++x)
                 sphSolver.CreateParticle(1, new Vector3d(5 + 0.1 * x, 4.9, 5), new Vector3d(5,0,0));
         }
+
+        private void CreateTwoCollisionFlow()
+        {
+            for (int x = 0; x < 50; ++x)
+                sphSolver.CreateParticle(1, new Vector3d(Vector3.one * Random.value * 0.2f) + new Vector3d(3 + 0.1 * x, 5, 5), new Vector3d(3 + Random.Range(0, 2f), 0, 0));
+
+            for (int x = 0; x < 50; ++x)
+                sphSolver.CreateParticle(1, new Vector3d(Vector3.one * Random.value * 0.2f) + new Vector3d(7 - 0.1 * x, 7, 5), new Vector3d(-3 - Random.Range(0, 2f), -5, 0));
+        }
+
+        private void CreatePenetrateWall()
+        {
+            for (int x = 0; x < 10; ++x)
+                for (int y = 0; y < 10; ++y)
+                        sphSolver.CreateParticle(1, new Vector3d(4 + 0.2 * x, 4 + 0.2 * y, 5), Vector3d.zero);
+
+            for (int z = 0; z < 10; ++z)
+                sphSolver.CreateParticle(1, new Vector3d(5, 5, 1 + 0.05 * z), new Vector3d(0, 0, 5 + Random.Range(0, 2f)));
+        }
+
+        #endregion
 
         private IEnumerator Simulate_CR()
         {

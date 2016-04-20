@@ -35,22 +35,6 @@ namespace SPHFluid.Render
             public static int stride = sizeof(float) * 3 * 6 + sizeof(int);
         };
 
-        private struct CSParticle
-        {
-            public float mass;
-            public float inv_density;
-            public Vector3 position;
-
-            public CSParticle(float mass, float inv_density, Vector3 position)
-            {
-                this.mass = mass;
-                this.inv_density = inv_density;
-                this.position = position;
-            }
-
-            public static int stride = sizeof(float) * 5;
-        }
-
         //x: width, y: height, z: length
         public int width = 16, height = 16, length = 16; // voxel size
         // The samples of the terrain density function
@@ -185,7 +169,7 @@ namespace SPHFluid.Render
 
             shaderSample.SetInts("_SphGridSize", sphSolver.gridSize._x, sphSolver.gridSize._y, sphSolver.gridSize._z);
             shaderSample.SetFloat("_KernelRadius", (float)sphSolver.kernelRadius);
-            shaderSample.SetFloat("_inv_KernelRadius", (float)sphSolver.kernelRadius);
+            shaderSample.SetFloat("_inv_KernelRadius", 1f / (float)sphSolver.kernelRadius);
             shaderSample.SetFloat("_kr2", (float)sphSolver.kr2);
             shaderSample.SetFloat("_inv_kr3", (float)sphSolver.inv_kr3);
             shaderSample.SetFloat("_inv_kr6", (float)sphSolver.inv_kr6);
@@ -349,9 +333,6 @@ namespace SPHFluid.Render
 
             bufferBlocks.Release();
             bufferBlocks = null;
-
-            float[] s = new float[nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize)];
-            bufferSamples.GetData(s);
 
             //marching-cube
 

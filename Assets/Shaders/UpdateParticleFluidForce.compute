@@ -1,0 +1,66 @@
+﻿#include "SPHInclude.compute"
+#pragma kernel UpdateParticleFluidForce
+
+//Input
+StructuredBuffer<bool> _NeighborSpace;
+StructuredBuffer<uint> _ParticleStartIndexPerCell;
+
+//Updating
+RWStructuredBuffer<Particle> _Particles;
+
+[numthreads(SPH_THREAD_NUM,SPH_THREAD_NUM,SPH_THREAD_NUM)]
+void UpdateParticleFluidForce (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
+{
+	uint flatIdx = groupIdx + groupId.x * SPH_THREAD_NUM_3D;
+	if(flatIdx >= _ParticleNum)
+		return;
+
+	uint3 cellIdx = floor(_Particles[flatIdx]._position * _inv_KernelRadius);
+
+	_Particles[flatIdx]._forcePressure = float3(0, 0, 0);
+	_Particles[flatIdx]._forceViscosity = float3(0, 0, 0);
+	_Particles[flatIdx]._forceTension = float3(0, 0, 0);
+	_Particles[flatIdx]._onSurface = false;
+	_Particles[flatIdx]._colorGradient = float3(0, 0, 0);
+	float tension = 0;
+
+	for(uint i = 0; i < 27; ++i)
+	{
+		if(!_NeighborSpace[flatIdx + i])
+		continue;
+
+		uint3 neighborIdx = cellIdx + neighborOffset[i];
+		uint neighborIdx1d = neighborIdx.x * _SphGridSize.y * _SphGridSize.z +
+								neighborIdx.y * _SphGridSize.z + 
+								neighborIdx.z;
+			
+		uint start = _ParticleStartIndexPerCell[neighborIdx1d];
+		uint end = _ParticleStartIndexPerCell[neighborIdx1d + 1]; //last element? -> one more element
+		for(uint n = start; n < end; ++n)
+		{
+			float3 relativePos = _Particles[flatIdx]._position - _Particles[n]._position;
+			_Particles[flatIdx]._forcePressure += (-0.5) * _Particles[n]._mass * 
+												(_Particles[flatIdx]._pressure + _Particles[n]._pressure) * 
+												_Particles[n]._inv_density *
+												GradKernelSpiky(relativePos);
+			
+			_Particles[flatIdx]._forceViscosity += _Particles[n]._mass *
+												 (_Particles[n]._velocity - _Particles[flatIdx]._velocity) *
+												 _Particles[n]._inv_density *
+												 LaplacianKernelViscosity(relativePos);
+
+			_Particles[flatIdx]._colorGradient += _Particles[n]._mass *  _Particles[n]._inv_density *
+												GradKernelPoly6(relativePos);
+
+			tension -= _Particles[n]._mass * _Particles[n]._inv_density * LaplacianKernelPoly6(relativePos);
+		}	
+	}
+
+	_Particles[flatIdx]._forceViscosity *= _Viscosity;
+
+	if(dot(_Particles[flatIdx]._colorGradient, _Particles[flatIdx]._colorGradient) > _SurfaceThreshold * _SurfaceThreshold)
+	{
+		_Particles[flatIdx]._onSurface = true;
+		_Particles[flatIdx]._forceTension = _TensionCoef * tension * normalize(_Particles[flatIdx]._colorGradient);
+	}
+}

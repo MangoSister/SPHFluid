@@ -1,6 +1,12 @@
 #ifndef SPH_INCLUDE
 #define SPH_INCLUDE
 
+/*** SPH Size ***/
+#define SPH_THREAD_NUM 10
+#define SPH_THREAD_NUM_2D 100
+#define SPH_THREAD_NUM_3D 1000
+
+/*** Marching Cube Size ***/
 #define BLOCK_SIZE 8
 #define BLOCK_SIZE_2D 64
 #define BLOCK_SIZE_3D 512
@@ -24,6 +30,15 @@ struct Particle
 	float _mass;
 	float _inv_density;
 	float3 _position;
+	float3 _velocity;
+	bool _onSurface;
+	float3 _midVelocity;
+    float3 _prevVelocity;
+    float _pressure;
+    float3 _forcePressure;
+    float3 _forceViscosity;
+    float3 _forceTension;
+	float3 _colorGradient;
 };
 
 //(x+1) + 3(y+1) + 9(z+1)
@@ -42,17 +57,29 @@ static int3 neighborOffset[27] =
 	int3(-1,1,1), int3(0,1,1), int3(1,1,1), 
 };
 
-//Please set these vars!!!!!!!!!!!!!
+//SPH solver params -- SET ME!!!!!
+uniform uint _ParticleNum;
 uniform uint3 _SphGridSize;
 uniform float _KernelRadius;
+
 uniform float _inv_KernelRadius;
 uniform float _kr2;
 uniform float _inv_kr3;
 uniform float _inv_kr6;
 uniform float _inv_kr9;
+
+uniform float _Stiffness;
+uniform float _RestDensity;
+uniform float3 _ExternalAcc;
+uniform float _Viscosity;
+uniform float _TensionCoef;
 uniform float _SurfaceThreshold;
+
+
+//MC Engine params -- SET ME!!!!!
 uniform float _MCVoxelScale;
 
+//SPH Const
 #define kPoly6Const (1.566681471061)
 #define gradKPoly6Const (-9.4000888264)
 #define lapKPoly6Const (-9.4000888264)
@@ -151,6 +178,51 @@ float3 GradKernelPoly6(float3 r)
     if (sqrDiff < 0)
 		return float3(0, 0, 0);
 	return gradKPoly6Const * _inv_kr9 * sqrDiff * sqrDiff * r;
+}
+
+float LaplacianKernelPoly6(float3 r)
+{
+	float r2 = dot(r, r);
+	float sqrDiff = (_kr2 - r2);
+	if (sqrDiff < 0)
+		return 0;
+    return lapKPoly6Const * _inv_kr9 * sqrDiff * (3 * _kr2 - 7 * r2);
+}
+
+float KernelSpiky(float3 r)
+{
+	float diff = _KernelRadius - length(r);
+    if (diff < 0)
+		return 0;
+    return kSpikyConst * _inv_kr6 * diff * diff * diff;
+}
+
+float3 GradKernelSpiky(float3 r)
+{
+    float mag = length(r);
+    float diff = (_KernelRadius - mag);
+    if (diff < 0 || mag <= 0)
+        return float3(0, 0, 0);
+    r *= (1 / mag);
+    return gradKSpikyConst * _inv_kr6 * diff * diff * r;
+}
+
+float KernelViscosity(float3 r)
+{
+    float mag = length(r);
+    if (_KernelRadius - mag < 0)
+        return 0;
+    float sqrMag = mag * mag;
+    return kViscosityConst * _inv_kr3 * (-0.5 * mag * sqrMag * _inv_kr3 + sqrMag / (_kr2) + 0.5 * _KernelRadius / mag - 1);
+}
+
+float LaplacianKernelViscosity(float3 r)
+{
+	float mag = length(r);
+    float diff = _KernelRadius - mag;
+    if (diff < 0 || mag <= 0)
+        return 0;
+    return lapkViscosityConst * _inv_kr6 * diff;
 }
 
 #endif
