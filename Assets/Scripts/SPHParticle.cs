@@ -56,6 +56,8 @@ namespace SPHFluid
         public Vector3 forceViscosity;
         public Vector3 forceTension;
         public Vector3 colorGradient;
+        public int cellIdx1d;
+
 
         public CSParticle(float mass, float inv_density, Vector3 position)
         {
@@ -71,6 +73,7 @@ namespace SPHFluid
             this.forceViscosity = Vector3.zero;
             this.forceTension = Vector3.zero;
             this.colorGradient = Vector3.zero;
+            this.cellIdx1d = 0;
         }
 
         public CSParticle(float mass, Vector3 position, Vector3 velocity)
@@ -87,8 +90,25 @@ namespace SPHFluid
             this.forceViscosity = Vector3.zero;
             this.forceTension = Vector3.zero;
             this.colorGradient = Vector3.zero;
+            this.cellIdx1d = 0;
         }
 
-    public static int stride = sizeof(float) * 27 + 4; //NOTICE that bool is 4 bytes on GPU!
+        public static int stride = sizeof(float) * 27 + 4 + sizeof(int); //NOTICE that bool is 4 bytes on GPU!
+    }
+
+    public class CSParticleComparer : IComparer
+    {
+        public int Compare(object x, object y)
+        {
+            CSParticle px = (CSParticle)x;
+            CSParticle py = (CSParticle)y;
+            if (px.cellIdx1d < py.cellIdx1d)
+                return -1;
+            else if (px.cellIdx1d > py.cellIdx1d)
+                return 1;
+            else return 0;
+        }
+
+        public static CSParticleComparer comparerInst = new CSParticleComparer();
     }
 }

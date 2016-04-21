@@ -39,6 +39,7 @@ struct Particle
     float3 _forceViscosity;
     float3 _forceTension;
 	float3 _colorGradient;
+	uint _cellIdx1d;
 };
 
 //(x+1) + 3(y+1) + 9(z+1)
@@ -238,7 +239,7 @@ inline void ApplyGridBoundaryCondition(inout Particle particle)
         contact.x = _Eps;
         contactNormal.x -= 1;
     }
-    if ((uint)cellIdx.x >= _SphGridSize.x)
+    if (cellIdx.x >= (int)_SphGridSize.x)
     {
         collision = true;
         contact.x = _SphGridSize.x * _KernelRadius - _Eps;
@@ -250,7 +251,7 @@ inline void ApplyGridBoundaryCondition(inout Particle particle)
         contact.y = _Eps;
         contactNormal.y -= 1;
     }
-    if ((uint)cellIdx.y >= _SphGridSize.y)
+    if (cellIdx.y >= (int)_SphGridSize.y)
     {
         collision = true;
         contact.y = _SphGridSize.y * _KernelRadius - _Eps;
@@ -262,7 +263,7 @@ inline void ApplyGridBoundaryCondition(inout Particle particle)
         contact.z = _Eps;
         contactNormal.z -= 1;
     }
-    if ((uint)cellIdx.z >= _SphGridSize.z)
+    if (cellIdx.z >= (int)_SphGridSize.z)
     {
         collision = true;
         contact.z = _SphGridSize.z * _KernelRadius - _Eps;

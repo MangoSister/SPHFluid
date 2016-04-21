@@ -34,21 +34,25 @@ namespace SPHFluid
                                         viscosity, tensionCoef, surfaceThreshold,
                                         gridSize._x, gridSize._y, gridSize._z, shaderSPH);
 
-
             //CreateTest25Square();
             //CreateDirFlow();
-            CreateTest125Cube();
+            //CreateTest125Cube();
             //CreateTest1000Cube();
             //CreateTwoCollisionFlow();
             //CreatePenetrateWall();
-
-            sphSolver.Init();
+            //CreateTest125CubeGPU();
+            CreateTest1000CubeGPU();
+            
+            //sphSolver.Init();
+            sphSolver.InitOnGPU();
 
             mcEngine.engineScale = (float)gridSize._x / (float)mcEngine.width;
             mcEngine.Init(sphSolver);
 
+            //if (sphSolver.currParticleNum > 0)
+            //    StartCoroutine(Simulate_CR());
             if (sphSolver.currParticleNum > 0)
-                StartCoroutine(Simulate_CR());
+                StartCoroutine(SimulatorOnGPU_CR());
         }
 
         private void OnDestroy()
@@ -77,6 +81,16 @@ namespace SPHFluid
                     }
         }
 
+        private void CreateTest125CubeGPU()
+        {
+            for (int x = 0; x < 5; ++x)
+                for (int y = 0; y < 5; ++y)
+                    for (int z = 0; z < 5; ++z)
+                    {
+                        sphSolver.CreateGPUParticle(1, new Vector3(5f + 0.1f * x, 5f + 0.1f * y, 5f + 0.1f * z), Vector3.zero);
+                    }
+        }
+
         private void CreateTest1000Cube()
         {
             for (int x = 0; x < 10; ++x)
@@ -87,6 +101,16 @@ namespace SPHFluid
                     }
         }
 
+
+        private void CreateTest1000CubeGPU()
+        {
+            for (int x = 0; x < 10; ++x)
+                for (int y = 0; y < 10; ++y)
+                    for (int z = 0; z < 10; ++z)
+                    {
+                        sphSolver.CreateGPUParticle(1, new Vector3(4f + 0.2f * x, 4f + 0.2f * y, 4f + 0.2f * z), Vector3.zero);
+                    }
+        }
 
         private void CreateDirFlow()
         {
@@ -117,7 +141,36 @@ namespace SPHFluid
 
         private IEnumerator SimulatorOnGPU_CR()
         {
-            yield return null;
+            HashSet<Int3> currUpdateMCBlocks = new HashSet<Int3>();
+            while (true)
+            {
+                yield return new WaitForSeconds(updateInterval);
+                //yield return null;
+                //if (!Input.GetKeyDown(KeyCode.S))
+                    //continue;
+                //Debug.Log("wa");
+                //#if UNITY_EDITOR
+                //                float startTime = Time.realtimeSinceStartup;
+                //#endif
+                sphSolver.StepOnGPU();
+                //update MarchingCubeEngine
+                currUpdateMCBlocks.Clear();
+                for (int i = 0; i < sphSolver.currParticleNum; ++i)
+                {
+                    if (sphSolver.allCSParticles[i].onSurface)
+                    {
+                        Vector3 blockOffset = (sphSolver.allCSParticles[i].position /*- mcEngine.engineOrigin*/) /
+                                                (mcEngine.engineScale * MarchingCubeEngine.blockSize);
+                        Int3 blockIdx = new Int3(Mathf.FloorToInt(blockOffset.x), Mathf.FloorToInt(blockOffset.y), Mathf.FloorToInt(blockOffset.z));
+                        currUpdateMCBlocks.Add(blockIdx);
+                    }
+                }
+
+                //#if UNITY_EDITOR
+                //                print("Time taken: " + (Time.realtimeSinceStartup - startTime) * 1000.0f);
+                //#endif
+                mcEngine.BatchUpdate(new List<Int3>(currUpdateMCBlocks));
+            }
         }
         
 
@@ -163,14 +216,26 @@ namespace SPHFluid
             Gizmos.DrawWireCube(center, extent * 2);
             Gizmos.color = Color.white;
 
-            if (sphSolver != null && sphSolver.allParticles != null && sphSolver.allParticles.Count > 0)
+            //if (sphSolver != null && sphSolver.allParticles != null && sphSolver.allParticles.Count > 0)
+            //{
+            //    for (int i = 0; i < sphSolver.allParticles.Count; ++i)
+            //    {
+            //        Vector3 pos = transform.position;
+            //        pos += new Vector3((float)sphSolver.allParticles[i].position.x,
+            //            (float)sphSolver.allParticles[i].position.y,
+            //            (float)sphSolver.allParticles[i].position.z);
+            //        Gizmos.DrawWireSphere(pos, 0.2f);
+            //    }
+            //}
+
+            if (sphSolver != null && sphSolver._allCSParticlesContainer != null && sphSolver._allCSParticlesContainer.Length > 0)
             {
-                for (int i = 0; i < sphSolver.allParticles.Count; ++i)
+                for (int i = 0; i < sphSolver._allCSParticlesContainer.Length; ++i)
                 {
                     Vector3 pos = transform.position;
-                    pos += new Vector3((float)sphSolver.allParticles[i].position.x,
-                        (float)sphSolver.allParticles[i].position.y,
-                        (float)sphSolver.allParticles[i].position.z);
+                    pos += new Vector3((float)sphSolver._allCSParticlesContainer[i].position.x,
+                        (float)sphSolver._allCSParticlesContainer[i].position.y,
+                        (float)sphSolver._allCSParticlesContainer[i].position.z);
                     Gizmos.DrawWireSphere(pos, 0.2f);
                 }
             }

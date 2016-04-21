@@ -1,0 +1,14 @@
+﻿#include "SPHInclude.compute"
+#pragma kernel RadixSortParticle
+
+//Input
+StructuredBuffer<Particle> _Particles;
+
+//Output
+RWStructuredBuffer<Particle> _SortedParticles;
+
+[numthreads(8,8,1)]
+void RadixSortParticle (uint3 id : SV_DispatchThreadID)
+{
+
+}

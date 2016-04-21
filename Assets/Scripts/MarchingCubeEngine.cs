@@ -77,8 +77,8 @@ namespace SPHFluid.Render
         private ComputeBuffer _bufferCornerToEdgeTable;
         private ComputeBuffer _bufferCornerToTriNumTable;
         private ComputeBuffer _bufferCornerToVertTable;
-        private ComputeBuffer _bufferParticles;
-        private ComputeBuffer _bufferParticlesStartIndex;
+        //private ComputeBuffer _bufferParticles;
+        //private ComputeBuffer _bufferParticlesStartIndex;
 
         //The position of engine (engineTransform.position -> origin)
         public Transform engineTransform;
@@ -164,8 +164,8 @@ namespace SPHFluid.Render
 
             this.sphSolver = sphSolver;
 
-            _bufferParticles = new ComputeBuffer(sphSolver.currParticleNum, CSParticle.stride);
-            _bufferParticlesStartIndex = new ComputeBuffer(sphSolver.gridCountXYZ + 1, sizeof(int));
+            //_bufferParticles = new ComputeBuffer(sphSolver.currParticleNum, CSParticle.stride);
+            //_bufferParticlesStartIndex = new ComputeBuffer(sphSolver.gridCountXYZ + 1, sizeof(int));
 
             shaderSample.SetInts("_SphGridSize", sphSolver.gridSize._x, sphSolver.gridSize._y, sphSolver.gridSize._z);
             shaderSample.SetFloat("_KernelRadius", (float)sphSolver.kernelRadius);
@@ -218,17 +218,17 @@ namespace SPHFluid.Render
                 _bufferCornerToVertTable = null;
             }
 
-            if (_bufferParticles != null)
-            {
-                _bufferParticles.Release();
-                _bufferParticles = null;
-            }
+            //if (_bufferParticles != null)
+            //{
+            //    _bufferParticles.Release();
+            //    _bufferParticles = null;
+            //}
 
-            if(_bufferParticlesStartIndex != null)
-            {
-                _bufferParticlesStartIndex.Release();
-                _bufferParticlesStartIndex = null;
-            }
+            //if(_bufferParticlesStartIndex != null)
+            //{
+            //    _bufferParticlesStartIndex.Release();
+            //    _bufferParticlesStartIndex = null;
+            //}
         }   
 
         /// <summary>
@@ -255,77 +255,40 @@ namespace SPHFluid.Render
             //"argumented block size"
             int ag1BlockSize = blockSize + 1;
 
-            //the array that hold samples in order to send them to GPU
-            //float[] samples = new float[nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize)];
-            //Vector3[] sampleNormals = new Vector3[nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize)];
-            //for (int blockNum = 0; blockNum < nextUpdateblocks.Count; blockNum++)
-            //{
-            //    var blockIdx = nextUpdateblocks[blockNum];
-            //    int x = blockIdx._x; int y = blockIdx._y; int z = blockIdx._z;
-            //    for (int ix = 0; ix < ag1BlockSize; ix++)
-            //        for (int iy = 0; iy < ag1BlockSize; iy++)
-            //            for (int iz = 0; iz < ag1BlockSize; iz++)
-            //            {
-            //                var queryX = x * blockSize + ix;
-            //                var queryY = y * blockSize + iy;
-            //                var queryZ = z * blockSize + iz;
-
-            //                float value; Vector3 normal;
-            //                implicitSurface(queryX, queryY, queryZ, out value, out normal);
-            //                int idx = ix +
-            //                    iy * (ag1BlockSize) +
-            //                    iz * (ag1BlockSize) * (ag1BlockSize) +
-            //                    blockNum * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize);
-
-            //                //store value
-            //                samples[idx] = value;
-            //                sampleNormals[idx] = normal;
-            //            }
-            //}
-            //#if UNITY_EDITOR
-            //            float startTime = Time.realtimeSinceStartup;
-            //#endif
-
-            //ComputeBuffer bufferSamples = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float));
-            //bufferSamples.SetData(samples);
-
-            //ComputeBuffer bufferNormals = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float) * 3);
-            //bufferNormals.SetData(sampleNormals);
-
             //GPU sampling attempt #0  
             ComputeBuffer bufferBlocks = new ComputeBuffer(nextUpdateblocks.Count, sizeof(int) * 3);
             bufferBlocks.SetData(nextUpdateblocks.ToArray());
 
             
-            List<CSParticle> particlesCopy = new List<CSParticle>();            
+            //List<CSParticle> particlesCopy = new List<CSParticle>();            
             
-            int[] particlesStartIdx = new int[sphSolver.gridCountXYZ + 1];
+            //int[] particlesStartIdx = new int[sphSolver.gridCountXYZ + 1];
 
-            int startIdx = 0;
-            for (int x = 0; x < sphSolver.gridSize._x; ++x)
-                for (int y = 0; y < sphSolver.gridSize._y; ++y)
-                    for (int z = 0; z < sphSolver.gridSize._z; ++z)
-                    {
-                        int idx = x * sphSolver.gridCountYZ + y * sphSolver.gridSize._z + z;
-                        foreach (var particle in sphSolver.grid[idx].particles)
-                        {
-                            particlesCopy.Add(new CSParticle((float)particle.mass, 1f / (float)particle.density,
-                                new Vector3((float)particle.position.x, (float)particle.position.y, (float)particle.position.z)));
-                        }
-                        particlesStartIdx[idx] = startIdx;
-                        startIdx += sphSolver.grid[idx].particles.Count;
-                    }
-            particlesStartIdx[particlesStartIdx.Length - 1] = sphSolver.currParticleNum;
+            //int startIdx = 0;
+            //for (int x = 0; x < sphSolver.gridSize._x; ++x)
+            //    for (int y = 0; y < sphSolver.gridSize._y; ++y)
+            //        for (int z = 0; z < sphSolver.gridSize._z; ++z)
+            //        {
+            //            int idx = x * sphSolver.gridCountYZ + y * sphSolver.gridSize._z + z;
+            //            foreach (var particle in sphSolver.grid[idx].particles)
+            //            {
+            //                particlesCopy.Add(new CSParticle((float)particle.mass, 1f / (float)particle.density,
+            //                    new Vector3((float)particle.position.x, (float)particle.position.y, (float)particle.position.z)));
+            //            }
+            //            particlesStartIdx[idx] = startIdx;
+            //            startIdx += sphSolver.grid[idx].particles.Count;
+            //        }
+            //particlesStartIdx[particlesStartIdx.Length - 1] = sphSolver.currParticleNum;
 
-            _bufferParticlesStartIndex.SetData(particlesStartIdx);
-            _bufferParticles.SetData(particlesCopy.ToArray());
+            //_bufferParticlesStartIndex.SetData(particlesStartIdx);
+            //_bufferParticles.SetData(particlesCopy.ToArray());
 
             ComputeBuffer bufferSamples = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float));
             ComputeBuffer bufferNormals = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float) * 3);
 
             shaderSample.SetBuffer(sampleKernel, "_Blocks", bufferBlocks);
-            shaderSample.SetBuffer(sampleKernel, "_ParticleStartIndexPerCell", _bufferParticlesStartIndex);
-            shaderSample.SetBuffer(sampleKernel, "_Particles", _bufferParticles);
+            shaderSample.SetBuffer(sampleKernel, "_ParticleStartIndexPerCell", sphSolver._bufferParticleStartIndexPerCell);
+            shaderSample.SetBuffer(sampleKernel, "_Particles", sphSolver._bufferParticles);
             shaderSample.SetBuffer(sampleKernel, "_Samples", bufferSamples);
             shaderSample.SetBuffer(sampleKernel, "_Normals", bufferNormals);
 

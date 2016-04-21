@@ -78,7 +78,7 @@ namespace SPHFluid
         #endregion
 
         public int maxParticleNum;
-        public int currParticleNum { get { return allParticles.Count; } }
+        public int currParticleNum { get { return allCSParticles.Count; } }
         public List<SPHParticle> allParticles { get; private set; }
 
         public double timeStep;
@@ -101,19 +101,23 @@ namespace SPHFluid
 
         #region GPU Adaptation
         public List<CSParticle> allCSParticles;
-        private CSParticle[] _allCSParticlesContainer;
+        public CSParticle[] _allCSParticlesContainer;
         private ComputeShader _shaderSPH;
+        private int _kernelCci;
         private int _kernelFns;
         private int _kernelUpd;
         private int _kernelUpff;
         private int _kernelAp;
         private int _kernelIp;
 
-        private ComputeBuffer _bufferParticles;
+        public ComputeBuffer _bufferParticles;
         private ComputeBuffer _bufferNeighborSpace;
         private ComputeBuffer _bufferParticleNumPerCell;
-        private ComputeBuffer _bufferParticleStartIndexPerCell;
-        private int[] _particleStartIndexPerCell;
+        public ComputeBuffer _bufferParticleStartIndexPerCell;
+        public int[] _particleStartIndexPerCell;
+        private bool[] _neighborSpaceInit;
+        private int[] _particleNumPerCellInit;
+
         #endregion
 
         public SPHSolver(int maxParticleNum, double timeStep, double kernelRadius,
@@ -124,6 +128,8 @@ namespace SPHFluid
             this.maxParticleNum = maxParticleNum;
             allParticles = new List<SPHParticle>();
             allParticles.Capacity = maxParticleNum;
+            allCSParticles = new List<CSParticle>();
+            allCSParticles.Capacity = maxParticleNum;
 
             this.timeStep = timeStep;
             this.kernelRadius = kernelRadius;
@@ -156,6 +162,7 @@ namespace SPHFluid
 
             _shaderSPH = shaderSPH;
 
+            _kernelCci = _shaderSPH.FindKernel("ComputeCellIdx");
             _kernelFns = _shaderSPH.FindKernel("FindNeighborSpace");
             _kernelUpd = _shaderSPH.FindKernel("UpdatePressureDensity");
             _kernelUpff = _shaderSPH.FindKernel("UpdateParticleFluidForce");
@@ -390,7 +397,7 @@ namespace SPHFluid
             return true;
         }
 
-    public void UpdateParticlePressure(SPHParticle particle)
+        public void UpdateParticlePressure(SPHParticle particle)
         {
             //density & pressure
             particle.density = 0;
@@ -589,21 +596,35 @@ namespace SPHFluid
         public void InitOnGPU()
         {
             isSolving = true;
+            _shaderSPH.SetInt("_ParticleNum", currParticleNum);
+
             _allCSParticlesContainer = allCSParticles.ToArray();
             _bufferParticles = new ComputeBuffer(currParticleNum, CSParticle.stride);
             _bufferParticles.SetData(_allCSParticlesContainer);
 
             _bufferNeighborSpace = new ComputeBuffer(currParticleNum * 27, 4);
+            _neighborSpaceInit = new bool[currParticleNum * 27];
+            _bufferNeighborSpace.SetData(_neighborSpaceInit);
+
             _bufferParticleNumPerCell = new ComputeBuffer(gridCountXYZ, sizeof(int));
+            _particleNumPerCellInit = new int[gridCountXYZ];
+            _bufferParticleNumPerCell.SetData(_particleNumPerCellInit);
+
             _bufferParticleStartIndexPerCell = new ComputeBuffer(gridCountXYZ + 1, sizeof(int));
             _particleStartIndexPerCell = new int[gridCountXYZ + 1];
+            _bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
 
-            _shaderSPH.SetBuffer(_kernelFns, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelFns, "_ParticleNumPerCell", _bufferParticleNumPerCell);
-            _shaderSPH.SetBuffer(_kernelFns, "_Particles", _bufferParticles);
-            _shaderSPH.SetBuffer(_kernelFns, "_NeighborSpace", _bufferNeighborSpace);
+            _shaderSPH.SetBuffer(_kernelCci, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
+            _shaderSPH.SetBuffer(_kernelCci, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelCci, "_Particles", _bufferParticles);
+            _shaderSPH.SetBuffer(_kernelCci, "_NeighborSpace", _bufferNeighborSpace);
 
-            _shaderSPH.Dispatch(_kernelFns, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+            _shaderSPH.Dispatch(_kernelCci, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+
+            _bufferParticles.GetData(_allCSParticlesContainer);
+            //sort based on cellIdx1d
+            Array.Sort(_allCSParticlesContainer, CSParticleComparer.comparerInst);
+            _bufferParticles.SetData(_allCSParticlesContainer);
 
             _bufferParticleNumPerCell.GetData(_particleStartIndexPerCell);
             int startIdx = 0;
@@ -614,6 +635,13 @@ namespace SPHFluid
                 startIdx += oldVal;
             }
             _bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
+
+            _shaderSPH.SetBuffer(_kernelFns, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
+            _shaderSPH.SetBuffer(_kernelFns, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelFns, "_Particles", _bufferParticles);
+            _shaderSPH.SetBuffer(_kernelFns, "_NeighborSpace", _bufferNeighborSpace);
+
+            _shaderSPH.Dispatch(_kernelFns, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
 
             _shaderSPH.SetBuffer(_kernelUpd, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
             _shaderSPH.SetBuffer(_kernelUpd, "_ParticleNumPerCell", _bufferParticleNumPerCell);
@@ -635,12 +663,40 @@ namespace SPHFluid
             _shaderSPH.SetBuffer(_kernelIp, "_NeighborSpace", _bufferNeighborSpace);
 
             _shaderSPH.Dispatch(_kernelIp, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+
+            _bufferParticles.GetData(_allCSParticlesContainer);
+
             isSolving = false;
         }
 
         public void StepOnGPU()
         {
             isSolving = true;
+
+            _bufferNeighborSpace.SetData(_neighborSpaceInit);
+            _bufferParticleNumPerCell.SetData(_particleNumPerCellInit);
+
+            _shaderSPH.SetBuffer(_kernelCci, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
+            _shaderSPH.SetBuffer(_kernelCci, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelCci, "_Particles", _bufferParticles);
+            _shaderSPH.SetBuffer(_kernelCci, "_NeighborSpace", _bufferNeighborSpace);
+
+            _shaderSPH.Dispatch(_kernelCci, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+
+            _bufferParticles.GetData(_allCSParticlesContainer);
+            //sort based on cellIdx1d
+            Array.Sort(_allCSParticlesContainer, CSParticleComparer.comparerInst);
+            _bufferParticles.SetData(_allCSParticlesContainer);
+
+            _bufferParticleNumPerCell.GetData(_particleStartIndexPerCell);
+            int startIdx = 0;
+            for (int i = 0; i < gridCountXYZ + 1; ++i)
+            {
+                int oldVal = _particleStartIndexPerCell[i];
+                _particleStartIndexPerCell[i] = startIdx;
+                startIdx += oldVal;
+            }
+            _bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
 
             _shaderSPH.SetBuffer(_kernelFns, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
             _shaderSPH.SetBuffer(_kernelFns, "_ParticleNumPerCell", _bufferParticleNumPerCell);
@@ -649,22 +705,14 @@ namespace SPHFluid
 
             _shaderSPH.Dispatch(_kernelFns, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
 
-            _bufferParticleNumPerCell.GetData(_particleStartIndexPerCell);
-            int startIdx = 0;
-            for (int i = 0; i<gridCountXYZ + 1; ++i)
-            {
-                int oldVal = _particleStartIndexPerCell[i];
-                _particleStartIndexPerCell[i] = startIdx;
-                startIdx += oldVal;
-            }
-            _bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
-
             _shaderSPH.SetBuffer(_kernelUpd, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
             _shaderSPH.SetBuffer(_kernelUpd, "_ParticleNumPerCell", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelUpd, "_Particles", _bufferParticles);
             _shaderSPH.SetBuffer(_kernelUpd, "_NeighborSpace", _bufferNeighborSpace);
 
             _shaderSPH.Dispatch(_kernelUpd, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+
+            _bufferParticles.GetData(_allCSParticlesContainer);
 
             _shaderSPH.SetBuffer(_kernelUpff, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
             _shaderSPH.SetBuffer(_kernelUpff, "_ParticleNumPerCell", _bufferParticleNumPerCell);
@@ -673,38 +721,21 @@ namespace SPHFluid
 
             _shaderSPH.Dispatch(_kernelUpff, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
 
-            _shaderSPH.SetBuffer(_kernelIp, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelIp, "_ParticleNumPerCell", _bufferParticleNumPerCell);
-            _shaderSPH.SetBuffer(_kernelIp, "_Particles", _bufferParticles);
-            _shaderSPH.SetBuffer(_kernelIp, "_NeighborSpace", _bufferNeighborSpace);
+            _bufferParticles.GetData(_allCSParticlesContainer);
+
+            _shaderSPH.SetBuffer(_kernelAp, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
+            _shaderSPH.SetBuffer(_kernelAp, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelAp, "_Particles", _bufferParticles);
+            _shaderSPH.SetBuffer(_kernelAp, "_NeighborSpace", _bufferNeighborSpace);
 
             _shaderSPH.Dispatch(_kernelAp, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
 
+            _bufferParticles.GetData(_allCSParticlesContainer);
+
             isSolving = false;
-         }
+        }
 
-//public int[] ComputeParticlesStartIdx()
-//{
-//    int[] particlesStartIdx = new int[gridCountXYZ + 1];
-
-//    int startIdx = 0;
-//    for (int x = 0; x < gridSize._x; ++x)
-//        for (int y = 0; y < gridSize._y; ++y)
-//            for (int z = 0; z < gridSize._z; ++z)
-//            {
-//                int idx = x * gridCountYZ + y * gridSize._z + z;
-//                foreach (var particle in grid[idx].particles)
-//                {
-//                    particlesCopy.Add(new CSParticle((float)particle.mass, 1f / (float)particle.density,
-//                        new Vector3((float)particle.position.x, (float)particle.position.y, (float)particle.position.z)));
-//                }
-//                particlesStartIdx[idx] = startIdx;
-//                startIdx += sphSolver.grid[idx].particles.Count;
-//            }
-//    particlesStartIdx[particlesStartIdx.Length - 1] = sphSolver.currParticleNum;
-//}
-
-public void Free()
+        public void Free()
         {
             if (_bufferNeighborSpace != null)
             {
