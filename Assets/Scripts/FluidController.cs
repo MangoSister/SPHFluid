@@ -9,6 +9,7 @@ namespace SPHFluid
     {
         public MarchingCubeEngine mcEngine;
         private SPHSolver sphSolver;
+        public ComputeShader shaderSPH;
 
         public int maxParticleNum;
         public float updateInterval;
@@ -31,7 +32,7 @@ namespace SPHFluid
             sphSolver = new SPHSolver(maxParticleNum, timeStep, kernelRadius,
                                         stiffness, restDensity, externalAcc,
                                         viscosity, tensionCoef, surfaceThreshold,
-                                        gridSize._x, gridSize._y, gridSize._z);
+                                        gridSize._x, gridSize._y, gridSize._z, shaderSPH);
 
 
             //CreateTest25Square();
@@ -52,6 +53,7 @@ namespace SPHFluid
 
         private void OnDestroy()
         {
+            sphSolver.Free();
             mcEngine.Free();
         }
 
@@ -112,6 +114,12 @@ namespace SPHFluid
         }
 
         #endregion
+
+        private IEnumerator SimulatorOnGPU_CR()
+        {
+            yield return null;
+        }
+        
 
         private IEnumerator Simulate_CR()
         {

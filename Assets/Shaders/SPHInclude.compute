@@ -75,7 +75,7 @@ uniform float3 _ExternalAcc;
 uniform float _Viscosity;
 uniform float _TensionCoef;
 uniform float _SurfaceThreshold;
-
+uniform float _Eps;
 
 //MC Engine params -- SET ME!!!!!
 uniform float _MCVoxelScale;
@@ -228,7 +228,55 @@ inline float LaplacianKernelViscosity(float3 r)
 
 inline void ApplyGridBoundaryCondition(inout Particle particle)
 {
-	
+	int3 cellIdx = floor(particle._position * _inv_KernelRadius);
+    bool collision = false;
+    float3 contact = particle._position;
+    float3 contactNormal = float3(0, 0, 0);
+    if (cellIdx.x < 0)
+    {
+        collision = true;
+        contact.x = _Eps;
+        contactNormal.x -= 1;
+    }
+    if ((uint)cellIdx.x >= _SphGridSize.x)
+    {
+        collision = true;
+        contact.x = _SphGridSize.x * _KernelRadius - _Eps;
+        contactNormal.x += 1;
+    }
+    if (cellIdx.y < 0)
+    {
+        collision = true;
+        contact.y = _Eps;
+        contactNormal.y -= 1;
+    }
+    if ((uint)cellIdx.y >= _SphGridSize.y)
+    {
+        collision = true;
+        contact.y = _SphGridSize.y * _KernelRadius - _Eps;
+        contactNormal.y += 1;
+    }
+    if (cellIdx.z < 0)
+    {
+        collision = true;
+        contact.z = _Eps;
+        contactNormal.z -= 1;
+    }
+    if ((uint)cellIdx.z >= _SphGridSize.z)
+    {
+        collision = true;
+        contact.z = _SphGridSize.z * _KernelRadius - _Eps;
+        contactNormal.z += 1;
+    }
+
+    if (collision)
+    {
+        contactNormal = normalize(contactNormal);
+        float3 proj = dot(particle._midVelocity, contactNormal) * contactNormal;
+        particle._position = contact;
+        particle._velocity -= (1 + 0.5) * proj;
+        particle._midVelocity = 0.5 * (particle._velocity + particle._prevVelocity);
+    }
 }
 
 #endif

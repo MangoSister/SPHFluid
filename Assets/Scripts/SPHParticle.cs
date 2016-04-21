@@ -73,6 +73,22 @@ namespace SPHFluid
             this.colorGradient = Vector3.zero;
         }
 
-        public static int stride = sizeof(float) * 27 + 4; //NOTICE that bool is 4 bytes on GPU!
+        public CSParticle(float mass, Vector3 position, Vector3 velocity)
+        {
+            this.mass = mass;
+            this.inv_density = 0f;
+            this.position = position;
+            this.velocity = velocity;
+            this.onSurface = false;
+            this.midVelocity = Vector3.zero;
+            this.prevVelocity = Vector3.zero;
+            this.pressure = 0f;
+            this.forcePressure = Vector3.zero;
+            this.forceViscosity = Vector3.zero;
+            this.forceTension = Vector3.zero;
+            this.colorGradient = Vector3.zero;
+        }
+
+    public static int stride = sizeof(float) * 27 + 4; //NOTICE that bool is 4 bytes on GPU!
     }
 }
