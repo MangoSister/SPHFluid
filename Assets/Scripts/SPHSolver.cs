@@ -159,7 +159,7 @@ namespace SPHFluid
                         grid[x * gridCountYZ + y * gridSize._z + z] = new SPHGridCell(x, y, z);
                         //grid[x * gridCountYZ + y * gridSize._z + z].particles.Capacity = maxParticleNum; //maybe not a good idea
                     }
-
+            
             _shaderSPH = shaderSPH;
 
             _kernelCci = _shaderSPH.FindKernel("ComputeCellIdx");
@@ -614,10 +614,9 @@ namespace SPHFluid
             _particleStartIndexPerCell = new int[gridCountXYZ + 1];
             _bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
 
-            _shaderSPH.SetBuffer(_kernelCci, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
+
             _shaderSPH.SetBuffer(_kernelCci, "_ParticleNumPerCell", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelCci, "_Particles", _bufferParticles);
-            _shaderSPH.SetBuffer(_kernelCci, "_NeighborSpace", _bufferNeighborSpace);
 
             _shaderSPH.Dispatch(_kernelCci, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
 
@@ -673,13 +672,39 @@ namespace SPHFluid
         {
             isSolving = true;
 
-            _bufferNeighborSpace.SetData(_neighborSpaceInit);
-            _bufferParticleNumPerCell.SetData(_particleNumPerCellInit);
+            _shaderSPH.SetBuffer(_kernelFns, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
+            _shaderSPH.SetBuffer(_kernelFns, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelFns, "_Particles", _bufferParticles);
 
-            _shaderSPH.SetBuffer(_kernelCci, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
+            _bufferNeighborSpace.SetData(_neighborSpaceInit);
+            _shaderSPH.SetBuffer(_kernelFns, "_NeighborSpace", _bufferNeighborSpace);
+
+            _shaderSPH.Dispatch(_kernelFns, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+
+            _shaderSPH.SetBuffer(_kernelUpd, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
+            _shaderSPH.SetBuffer(_kernelUpd, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelUpd, "_Particles", _bufferParticles);
+            _shaderSPH.SetBuffer(_kernelUpd, "_NeighborSpace", _bufferNeighborSpace);
+
+            _shaderSPH.Dispatch(_kernelUpd, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+
+            _shaderSPH.SetBuffer(_kernelUpff, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
+            _shaderSPH.SetBuffer(_kernelUpff, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelUpff, "_Particles", _bufferParticles);
+            _shaderSPH.SetBuffer(_kernelUpff, "_NeighborSpace", _bufferNeighborSpace);
+
+            _shaderSPH.Dispatch(_kernelUpff, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+
+            _shaderSPH.SetBuffer(_kernelAp, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
+            _shaderSPH.SetBuffer(_kernelAp, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelAp, "_Particles", _bufferParticles);
+            _shaderSPH.SetBuffer(_kernelAp, "_NeighborSpace", _bufferNeighborSpace);
+
+            _shaderSPH.Dispatch(_kernelAp, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+
+            _bufferParticleNumPerCell.SetData(_particleNumPerCellInit);
             _shaderSPH.SetBuffer(_kernelCci, "_ParticleNumPerCell", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelCci, "_Particles", _bufferParticles);
-            _shaderSPH.SetBuffer(_kernelCci, "_NeighborSpace", _bufferNeighborSpace);
 
             _shaderSPH.Dispatch(_kernelCci, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
 
@@ -697,40 +722,6 @@ namespace SPHFluid
                 startIdx += oldVal;
             }
             _bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
-
-            _shaderSPH.SetBuffer(_kernelFns, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelFns, "_ParticleNumPerCell", _bufferParticleNumPerCell);
-            _shaderSPH.SetBuffer(_kernelFns, "_Particles", _bufferParticles);
-            _shaderSPH.SetBuffer(_kernelFns, "_NeighborSpace", _bufferNeighborSpace);
-
-            _shaderSPH.Dispatch(_kernelFns, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
-
-            _shaderSPH.SetBuffer(_kernelUpd, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelUpd, "_ParticleNumPerCell", _bufferParticleNumPerCell);
-            _shaderSPH.SetBuffer(_kernelUpd, "_Particles", _bufferParticles);
-            _shaderSPH.SetBuffer(_kernelUpd, "_NeighborSpace", _bufferNeighborSpace);
-
-            _shaderSPH.Dispatch(_kernelUpd, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
-
-            _bufferParticles.GetData(_allCSParticlesContainer);
-
-            _shaderSPH.SetBuffer(_kernelUpff, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelUpff, "_ParticleNumPerCell", _bufferParticleNumPerCell);
-            _shaderSPH.SetBuffer(_kernelUpff, "_Particles", _bufferParticles);
-            _shaderSPH.SetBuffer(_kernelUpff, "_NeighborSpace", _bufferNeighborSpace);
-
-            _shaderSPH.Dispatch(_kernelUpff, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
-
-            _bufferParticles.GetData(_allCSParticlesContainer);
-
-            _shaderSPH.SetBuffer(_kernelAp, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelAp, "_ParticleNumPerCell", _bufferParticleNumPerCell);
-            _shaderSPH.SetBuffer(_kernelAp, "_Particles", _bufferParticles);
-            _shaderSPH.SetBuffer(_kernelAp, "_NeighborSpace", _bufferNeighborSpace);
-
-            _shaderSPH.Dispatch(_kernelAp, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
-
-            _bufferParticles.GetData(_allCSParticlesContainer);
 
             isSolving = false;
         }

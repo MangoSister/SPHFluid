@@ -1,14 +1,20 @@
 ﻿#include "SPHInclude.compute"
-#pragma kernel RadixSortParticle
+#pragma kernel CountBucket
+
+#define BITS_PER_ROTATION 4
+#define BUCKET_SIZE 16
 
 //Input
 StructuredBuffer<Particle> _Particles;
 
+//Update
+groupshared uint _Bucket[16];
+
 //Output
 RWStructuredBuffer<Particle> _SortedParticles;
 
-[numthreads(8,8,1)]
-void RadixSortParticle (uint3 id : SV_DispatchThreadID)
+[numthreads(SPH_THREAD_NUM,SPH_THREAD_NUM,SPH_THREAD_NUM)]
+void CountBucket (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 {
 
 }

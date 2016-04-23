@@ -157,9 +157,9 @@ namespace SPHFluid
                 currUpdateMCBlocks.Clear();
                 for (int i = 0; i < sphSolver.currParticleNum; ++i)
                 {
-                    if (sphSolver.allCSParticles[i].onSurface)
+                    if (sphSolver._allCSParticlesContainer[i].onSurface)
                     {
-                        Vector3 blockOffset = (sphSolver.allCSParticles[i].position /*- mcEngine.engineOrigin*/) /
+                        Vector3 blockOffset = (sphSolver._allCSParticlesContainer[i].position /*- mcEngine.engineOrigin*/) /
                                                 (mcEngine.engineScale * MarchingCubeEngine.blockSize);
                         Int3 blockIdx = new Int3(Mathf.FloorToInt(blockOffset.x), Mathf.FloorToInt(blockOffset.y), Mathf.FloorToInt(blockOffset.z));
                         currUpdateMCBlocks.Add(blockIdx);
