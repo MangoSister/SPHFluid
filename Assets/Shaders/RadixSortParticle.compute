@@ -38,8 +38,8 @@ void CheckOrder (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 	uint flatIdx = groupIdx + groupId.x * SORT_SECTION_SIZE_2D;
 	if(flatIdx >= _ParticleNum - 1)
 		return;
-	
-	if(_Particles[flatIdx]._cellIdx1d > _Particles[flatIdx]._cellIdx1d + 1)
+
+	if(_Particles[flatIdx]._cellIdx1d > _Particles[flatIdx + 1]._cellIdx1d)
 		InterlockedAnd(_Ordered[0], 0);
 }
 
@@ -102,7 +102,7 @@ void PrecedeScan (uint3 threadId : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 	GroupMemoryBarrierWithGroupSync();
 
 	//parallel scan: up-sweep
-	uint d = 0;
+	int d = 0;
 	for(d = 0; d < LOG2_SORT_SECTION_SIZE_2D - 1; ++d)
 	{
 		uint pow_2_d_1 = 1 << (d + 1);
@@ -121,8 +121,8 @@ void PrecedeScan (uint3 threadId : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 	}
 	GroupMemoryBarrierWithGroupSync();
 
-	//parallel scan: down-sweep
-	for(d = LOG2_SORT_SECTION_SIZE_2D; d > 0; --d)
+	////parallel scan: down-sweep
+	for(d = LOG2_SORT_SECTION_SIZE_2D - 1; d >= 0; --d)
 	{
 		uint pow_2_d_1 = 1 << (d + 1);
 		uint pow_2_d = (1 << d);

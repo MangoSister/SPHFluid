@@ -118,12 +118,16 @@ namespace SPHFluid
         private bool[] _neighborSpaceInit;
         private int[] _particleNumPerCellInit;
 
+        private ComputeShader _shaderRadixSort;
+        private GPURadixSortParticles _GPUSorter;
+
         #endregion
 
         public SPHSolver(int maxParticleNum, double timeStep, double kernelRadius,
                         double stiffness, double restDensity, Vector3d externalAcc,
                         double viscosity, double tensionCoef, double surfaceThreshold,
-                        int gridSizeX, int gridSizeY, int gridSizeZ, ComputeShader shaderSPH)
+                        int gridSizeX, int gridSizeY, int gridSizeZ, ComputeShader shaderSPH,
+                        ComputeShader shaderRadixSort)
         {
             this.maxParticleNum = maxParticleNum;
             allParticles = new List<SPHParticle>();
@@ -184,6 +188,8 @@ namespace SPHFluid
             _shaderSPH.SetFloat("_TensionCoef", (float)tensionCoef);
             _shaderSPH.SetFloat("_SurfaceThreshold", (float)surfaceThreshold);
             _shaderSPH.SetFloat("_Eps", (float)MathHelper.Eps);
+
+            _shaderRadixSort = shaderRadixSort;
 
             isSolving = false;
         }
@@ -595,6 +601,8 @@ namespace SPHFluid
 
         public void InitOnGPU()
         {
+            _GPUSorter = new GPURadixSortParticles(_shaderRadixSort, currParticleNum);
+
             isSolving = true;
             _shaderSPH.SetInt("_ParticleNum", currParticleNum);
 
@@ -620,10 +628,13 @@ namespace SPHFluid
 
             _shaderSPH.Dispatch(_kernelCci, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
 
-            _bufferParticles.GetData(_allCSParticlesContainer);
-            //sort based on cellIdx1d
-            Array.Sort(_allCSParticlesContainer, CSParticleComparer.comparerInst);
-            _bufferParticles.SetData(_allCSParticlesContainer);
+            _GPUSorter.Init(_bufferParticles);
+            _GPUSorter.Sort();
+
+            //_bufferParticles.GetData(_allCSParticlesContainer);
+            ////sort based on cellIdx1d
+            //Array.Sort(_allCSParticlesContainer, CSParticleComparer.comparerInst);
+            //_bufferParticles.SetData(_allCSParticlesContainer);
 
             _bufferParticleNumPerCell.GetData(_particleStartIndexPerCell);
             int startIdx = 0;
@@ -708,10 +719,13 @@ namespace SPHFluid
 
             _shaderSPH.Dispatch(_kernelCci, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
 
-            _bufferParticles.GetData(_allCSParticlesContainer);
-            //sort based on cellIdx1d
-            Array.Sort(_allCSParticlesContainer, CSParticleComparer.comparerInst);
-            _bufferParticles.SetData(_allCSParticlesContainer);
+            _GPUSorter.Init(_bufferParticles);
+            _GPUSorter.Sort();
+
+            //_bufferParticles.GetData(_allCSParticlesContainer);
+            ////sort based on cellIdx1d
+            //Array.Sort(_allCSParticlesContainer, CSParticleComparer.comparerInst);
+            //_bufferParticles.SetData(_allCSParticlesContainer);
 
             _bufferParticleNumPerCell.GetData(_particleStartIndexPerCell);
             int startIdx = 0;
@@ -751,6 +765,8 @@ namespace SPHFluid
                 _bufferParticleStartIndexPerCell.Release();
                 _bufferParticleStartIndexPerCell = null;
             }
+
+            _GPUSorter.Free();
         }
     }
 }
