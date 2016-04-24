@@ -12,9 +12,12 @@ public class GPURadixSortTest : MonoBehaviour
     public ComputeBuffer bufferSortedParticles;
     public ComputeBuffer bufferLocalBucket;
     public ComputeBuffer bufferGroupKeyOffset;
-
+    public ComputeBuffer bufferLocalBinMarkers;
     public int sortSectionNum;
+    public int groupNum;
 
+    public int kernelLocalCount;
+    public int kernelPrecedeScan;
     public int kernelLocalSort;
     public int kernelComputeGroupKeyOffset;
     public int kernelGlobalReorder;
@@ -23,6 +26,7 @@ public class GPURadixSortTest : MonoBehaviour
     {
         particles = new CSParticle[512];
         sortSectionNum = 64;
+        groupNum = Mathf.CeilToInt((float)particles.Length / (float)sortSectionNum);
         for (int i = 0; i < particles.Length; ++i)
         {
             particles[i].cellIdx1d = particles.Length - 1 - i;
@@ -38,12 +42,17 @@ public class GPURadixSortTest : MonoBehaviour
         bufferGlobalBucket = new ComputeBuffer(16, sizeof(int));
         bufferGlobalBucket.SetData(new int[16]);
 
-        bufferLocalBucket = new ComputeBuffer(16 * (particles.Length / sortSectionNum), sizeof(int));
-        bufferLocalBucket.SetData(new int[16 * (particles.Length / sortSectionNum)]);
+        bufferLocalBucket = new ComputeBuffer(16 * groupNum, sizeof(int));
+        bufferLocalBucket.SetData(new int[16 * groupNum]);
 
-        bufferGroupKeyOffset = new ComputeBuffer(16 * (particles.Length / sortSectionNum), sizeof(int));
-        bufferGroupKeyOffset.SetData(new int[16 * (particles.Length / sortSectionNum)]);
+        bufferGroupKeyOffset = new ComputeBuffer(16 * groupNum, sizeof(int));
+        bufferGroupKeyOffset.SetData(new int[16 * groupNum]);
 
+        bufferLocalBinMarkers = new ComputeBuffer(16 * sortSectionNum * groupNum, sizeof(int));
+        bufferLocalBinMarkers.SetData(new int[16 * sortSectionNum * groupNum]);
+
+        kernelLocalCount = shaderRadixSort.FindKernel("LocalCount");
+        kernelPrecedeScan = shaderRadixSort.FindKernel("PrecedeScan");
         kernelLocalSort = shaderRadixSort.FindKernel("LocalSort");
         kernelComputeGroupKeyOffset = shaderRadixSort.FindKernel("ComputeGroupKeyOffset");
         kernelGlobalReorder = shaderRadixSort.FindKernel("GlobalReorder");
@@ -72,37 +81,43 @@ public class GPURadixSortTest : MonoBehaviour
         float t = Time.realtimeSinceStartup;
         bufferParticles.SetData(particles);
         bufferGlobalBucket.SetData(new int[16]);
-        bufferLocalBucket.SetData(new int[16 * (particles.Length / sortSectionNum)]);
-        bufferGroupKeyOffset.SetData(new int[16 * (particles.Length / sortSectionNum)]);
+        bufferLocalBucket.SetData(new int[16 * groupNum]);
+        bufferGroupKeyOffset.SetData(new int[16 * groupNum]);
 
-        shaderRadixSort.SetInt("_SortSectionNum", Mathf.CeilToInt((float)particles.Length / (float)sortSectionNum));
+        shaderRadixSort.SetInt("_SortSectionNum", groupNum);
         shaderRadixSort.SetInt("_ParticleNum", particles.Length);
         shaderRadixSort.SetInt("_RotationRound", round);
-        shaderRadixSort.SetBuffer(kernelLocalSort, "_Ordered", bufferOrdered);
-        shaderRadixSort.SetBuffer(kernelLocalSort, "_Particles", bufferParticles);
-        shaderRadixSort.SetBuffer(kernelLocalSort, "_GlobalPrefixSum", bufferGlobalBucket);
-        shaderRadixSort.SetBuffer(kernelLocalSort, "_LocalPrefixSum", bufferLocalBucket);
-        shaderRadixSort.SetBuffer(kernelLocalSort, "_GroupKeyOffset", bufferGroupKeyOffset);
-        shaderRadixSort.SetBuffer(kernelLocalSort, "_SortedParticles", bufferSortedParticles);
 
-        shaderRadixSort.Dispatch(kernelLocalSort, Mathf.CeilToInt((float)particles.Length / (float)sortSectionNum), 1, 1);
+        shaderRadixSort.SetBuffer(kernelLocalCount, "_Ordered", bufferOrdered);
+        shaderRadixSort.SetBuffer(kernelLocalCount, "_Particles", bufferParticles);
+        shaderRadixSort.SetBuffer(kernelLocalCount, "_GlobalPrefixSum", bufferGlobalBucket);
+        shaderRadixSort.SetBuffer(kernelLocalCount, "_LocalPrefixSum", bufferLocalBucket);
+        shaderRadixSort.SetBuffer(kernelLocalCount, "_GroupKeyOffset", bufferGroupKeyOffset);
+        shaderRadixSort.SetBuffer(kernelLocalCount, "_LocalBinMarkers", bufferLocalBinMarkers);
+        //shaderRadixSort.SetBuffer(kernelLocalCount, "_SortedParticles", bufferSortedParticles);
 
-        bufferSortedParticles.GetData(particles);
+        shaderRadixSort.Dispatch(kernelLocalCount, groupNum, 1, 1);
+
         int[] gBuckets = new int[16];
         bufferGlobalBucket.GetData(gBuckets);
 
-        int[] lBuckets = new int[16 * particles.Length / sortSectionNum];
+        int[] lBuckets = new int[16 * groupNum];
         bufferLocalBucket.GetData(lBuckets);
 
-        int[] keyOffset = new int[16 * particles.Length / sortSectionNum];
+        int[] keyOffset = new int[16 * groupNum];
         bufferGroupKeyOffset.GetData(keyOffset);
-        //foreach (var p in particles)
-        //    print(p.cellIdx1d & 15);
+
+        int[] binMarkers = new int[16 * sortSectionNum * groupNum];
+        bufferLocalBinMarkers.GetData(binMarkers);
+
+        shaderRadixSort.SetBuffer(kernelPrecedeScan, "_LocalBinMarkers", bufferLocalBinMarkers);
+        shaderRadixSort.Dispatch(kernelPrecedeScan, groupNum, 1, 1);
+
+        bufferLocalBinMarkers.GetData(binMarkers);
 
         shaderRadixSort.SetBuffer(kernelComputeGroupKeyOffset, "_GroupKeyOffset", bufferGroupKeyOffset);
+
         shaderRadixSort.Dispatch(kernelComputeGroupKeyOffset, 1, 1, 1);
-
-
         bufferGroupKeyOffset.GetData(keyOffset);
 
         shaderRadixSort.SetBuffer(kernelGlobalReorder, "_Particles", bufferSortedParticles);
@@ -111,7 +126,7 @@ public class GPURadixSortTest : MonoBehaviour
         shaderRadixSort.SetBuffer(kernelGlobalReorder, "_LocalPrefixSum", bufferLocalBucket);
         shaderRadixSort.SetBuffer(kernelGlobalReorder, "_GroupKeyOffset", bufferGroupKeyOffset);
 
-        shaderRadixSort.Dispatch(kernelGlobalReorder, Mathf.CeilToInt((float)particles.Length / (float)sortSectionNum), 1, 1);
+        shaderRadixSort.Dispatch(kernelGlobalReorder, groupNum, 1, 1);
         bufferParticles.GetData(particles);
         //foreach (var p in particles)
         //    print((p.cellIdx1d >> (round * 4)) & 15);
@@ -152,6 +167,12 @@ public class GPURadixSortTest : MonoBehaviour
         {
             bufferOrdered.Release();
             bufferOrdered = null;
+        }
+
+        if(bufferLocalBinMarkers != null)
+        {
+            bufferLocalBinMarkers.Release();
+            bufferLocalBinMarkers = null;
         }
 
         if (bufferSortedParticles != null)
