@@ -1,26 +1,33 @@
 ﻿#include "SPHInclude.compute"
 #pragma kernel CheckOrder
 #pragma kernel LocalSort
+#pragma kernel ComputeGroupKeyOffset
 #pragma kernel GlobalReorder
 
-#define SORT_SECTION_SIZE 16
-#define SORT_SECTION_SIZE_2D 256
+#define SORT_SECTION_SIZE 8
+#define SORT_SECTION_SIZE_2D 64
+#define LOG2_SORT_SECTION_SIZE_2D 6
 #define BITS_PER_ROTATION 4
 #define BITS_MASK 15
 #define BUCKET_SIZE 16
 
 //Input
+uint _SortSectionNum; //please set me
 uint _RotationRound; //need to be set every round
 StructuredBuffer<Particle> _Particles;
 
 //Update
 RWBuffer<uint> _Ordered; //need to be initialized as true
 groupshared uint _GroupBucket[BUCKET_SIZE];
+groupshared uint _GroupBinMarkers[BUCKET_SIZE * SORT_SECTION_SIZE_2D];
 groupshared uint _GroupContainer[SORT_SECTION_SIZE_2D];
 RWBuffer<uint> _GlobalPrefixSum; //[BUCKET_SIZE]; //need to be initialized as all zeros
 RWBuffer<uint> _LocalPrefixSum; //[BUCKET_SIZE * Group number], need to be initialized as all zeros
+RWBuffer<uint> _GroupKeyOffset; //[BUCKET_SIZE * Group number]
+
 //Output
 RWStructuredBuffer<Particle> _SortedParticles;
+
 
 [numthreads(SORT_SECTION_SIZE,SORT_SECTION_SIZE,1)]
 void CheckOrder (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
@@ -43,7 +50,11 @@ void LocalSort (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 			_GroupBucket[i] = 0;
 	}
 	if(groupId.x == 0)
+	{
 		_GroupContainer[groupIdx] = 0;
+		for(int i = 0; i < BUCKET_SIZE; ++i)
+			_GroupBinMarkers[groupIdx + i * SORT_SECTION_SIZE_2D] = 0;
+	}
 	GroupMemoryBarrierWithGroupSync();
 
 	uint flatIdx = groupIdx + groupId.x * SORT_SECTION_SIZE_2D;	
@@ -52,6 +63,7 @@ void LocalSort (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 	{
 		//generate local histogram
 		bin = (_Particles[flatIdx]._cellIdx1d >> (_RotationRound * BITS_PER_ROTATION)) & BITS_MASK;
+		_GroupBinMarkers[groupIdx + bin * SORT_SECTION_SIZE_2D] = 1;
 		InterlockedAdd(_GroupBucket[bin], 1);
 	}
 	GroupMemoryBarrierWithGroupSync();
@@ -63,6 +75,7 @@ void LocalSort (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 		for(int i = 0; i < BUCKET_SIZE; ++i)
 		{
 			uint oldVal = _GroupBucket[i];
+			_GroupKeyOffset[BUCKET_SIZE * groupId.x + i] = oldVal;
 			_GroupBucket[i] = counter;
 			InterlockedAdd(_GlobalPrefixSum[i], _GroupBucket[i]);
 			_LocalPrefixSum[BUCKET_SIZE * groupId.x + i] = _GroupBucket[i];
@@ -70,6 +83,45 @@ void LocalSort (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 		}
 	}
 	GroupMemoryBarrierWithGroupSync();
+	
+	//parallel scan: up-sweep
+	for(uint i = 0; i < BUCKET_SIZE; ++i)
+	{
+		for(uint d = 0; d < LOG2_SORT_SECTION_SIZE_2D - 1; ++d)
+		{
+			if(groupIdx % (1 << (d + 1)) == 0)
+			{
+				_GroupBinMarkers[groupIdx + i * SORT_SECTION_SIZE_2D + (1 << (d + 1)) - 1] +=
+				_GroupBinMarkers[groupIdx + i * SORT_SECTION_SIZE_2D + (1 << d) - 1];
+			}
+		}
+	}
+	GroupMemoryBarrierWithGroupSync();
+
+	//parallel scan: set last element to zero
+	if(groupIdx == SORT_SECTION_SIZE_2D - 1)
+	{
+		for(uint i = 0; i < BUCKET_SIZE; ++i)
+			_GroupBinMarkers[groupIdx + i * SORT_SECTION_SIZE_2D] = 0;
+	}
+	GroupMemoryBarrierWithGroupSync();
+
+	//parallel scan: down-sweep
+	for(uint j = 0; j < BUCKET_SIZE; ++j)
+	{
+		for(uint d = LOG2_SORT_SECTION_SIZE_2D; d > 0; --d)
+		{
+			if(groupIdx % (1 << (d + 1)) == 0)
+			{
+				uint old = _GroupBinMarkers[groupIdx + j * SORT_SECTION_SIZE_2D + (1 << d) - 1];
+				_GroupBinMarkers[groupIdx + j * SORT_SECTION_SIZE_2D + (1 << d) - 1] =
+				_GroupBinMarkers[groupIdx + j * SORT_SECTION_SIZE_2D + (1 << (d + 1)) - 1];
+				_GroupBinMarkers[groupIdx + j * SORT_SECTION_SIZE_2D + (1 << (d + 1)) - 1] += old;
+			}
+		}
+	}
+	GroupMemoryBarrierWithGroupSync();
+
 
 	if(flatIdx < _ParticleNum)
 	{
@@ -80,12 +132,35 @@ void LocalSort (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 	}
 	GroupMemoryBarrierWithGroupSync();
 
+	//local reorder
 	if(flatIdx < _ParticleNum)
 		_SortedParticles[flatIdx] = _Particles[_GroupContainer[groupIdx]];
+}
+
+[numthreads(BUCKET_SIZE,1,1)]
+void ComputeGroupKeyOffset (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
+{
+	uint counter = 0;
+	for(uint i = 0; i < _SortSectionNum; ++i)
+	{
+		uint oldVal = _GroupKeyOffset[groupIdx + i * BUCKET_SIZE];
+		_GroupKeyOffset[groupIdx + i * BUCKET_SIZE] = counter;
+		counter += oldVal;
+	}
 }
 
 [numthreads(SORT_SECTION_SIZE,SORT_SECTION_SIZE,1)]
 void GlobalReorder (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 {
-	
+	uint flatIdx = groupIdx + groupId.x * SORT_SECTION_SIZE_2D;
+	if(flatIdx >= _ParticleNum)
+		return;
+
+	uint bin = (_Particles[flatIdx]._cellIdx1d >> (_RotationRound * BITS_PER_ROTATION)) & BITS_MASK;
+	uint outIdx = _GlobalPrefixSum[bin] + 
+				  _GroupKeyOffset[groupId.x * BUCKET_SIZE + bin] +
+				  //local index
+				  groupIdx - _LocalPrefixSum[BUCKET_SIZE * groupId.x + bin];
+
+	_SortedParticles[outIdx] = _Particles[flatIdx];
 }
