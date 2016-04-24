@@ -26,6 +26,9 @@ namespace SPHFluid
         [HideInInspector]
         public Int3 gridSize;
 
+        private HashSet<Int3> _currUpdateMCBlocks;
+        private float _timer;
+
         private void Start()
         {
             //ExampleMc()
@@ -35,12 +38,6 @@ namespace SPHFluid
                                         gridSize._x, gridSize._y, gridSize._z, shaderSPH,
                                         shaderRadixSort);
             
-            //CreateTest25Square();
-            //CreateDirFlow();
-            //CreateTest125Cube();
-            //CreateTest1000Cube();
-            //CreateTwoCollisionFlow();
-            //CreatePenetrateWall();
             //CreateTest125CubeGPU();
             CreateTest1000CubeGPU();
             
@@ -50,10 +47,8 @@ namespace SPHFluid
             mcEngine.engineScale = (float)gridSize._x / (float)mcEngine.width;
             mcEngine.Init(sphSolver);
 
-            //if (sphSolver.currParticleNum > 0)
-            //    StartCoroutine(Simulate_CR());
-            if (sphSolver.currParticleNum > 0)
-                StartCoroutine(SimulatorOnGPU_CR());
+            _currUpdateMCBlocks = new HashSet<Int3>();
+            _timer = 0f;
         }
 
         private void OnDestroy()
@@ -63,25 +58,6 @@ namespace SPHFluid
         }
 
         #region Test Cases
-        private void CreateTest25Square()
-        {
-            for (int x = 0; x < 5; ++x)
-                for (int z = 0; z < 5; ++z)
-                {
-                    sphSolver.CreateParticle(1, new Vector3d(5 + 0.1 * x, 4.9, 5 + 0.1 * z), Vector3d.zero);
-                }
-        }
-
-        private void CreateTest125Cube()
-        {
-            for (int x = 0; x < 5; ++x)
-                for (int y = 0; y < 5; ++y)
-                    for (int z = 0; z < 5; ++z)
-                    {
-                        sphSolver.CreateParticle(1, new Vector3d(5 + 0.1 * x, 5 + 0.1 * y, 5 + 0.1 * z), Vector3d.zero);
-                    }
-        }
-
         private void CreateTest125CubeGPU()
         {
             for (int x = 0; x < 5; ++x)
@@ -92,17 +68,6 @@ namespace SPHFluid
                     }
         }
 
-        private void CreateTest1000Cube()
-        {
-            for (int x = 0; x < 10; ++x)
-                for (int y = 0; y < 10; ++y)
-                    for (int z = 0; z < 10; ++z)
-                    {
-                        sphSolver.CreateParticle(1, new Vector3d(4 + 0.2 * x, 4 + 0.2 * y, 4 + 0.2 * z), Vector3d.zero);
-                    }
-        }
-
-
         private void CreateTest1000CubeGPU()
         {
             for (int x = 0; x < 10; ++x)
@@ -112,50 +77,16 @@ namespace SPHFluid
                         sphSolver.CreateGPUParticle(1, new Vector3(4f + 0.2f * x, 4f + 0.2f * y, 4f + 0.2f * z), Vector3.zero);
                     }
         }
-
-        private void CreateDirFlow()
-        {
-            for (int x = 0; x < 20; ++x)
-                sphSolver.CreateParticle(1, new Vector3d(5 + 0.1 * x, 4.9, 5), new Vector3d(5,0,0));
-        }
-
-        private void CreateTwoCollisionFlow()
-        {
-            for (int x = 0; x < 50; ++x)
-                sphSolver.CreateParticle(1, new Vector3d(Vector3.one * Random.value * 0.2f) + new Vector3d(3 + 0.1 * x, 5, 5), new Vector3d(3 + Random.Range(0, 2f), 0, 0));
-
-            for (int x = 0; x < 50; ++x)
-                sphSolver.CreateParticle(1, new Vector3d(Vector3.one * Random.value * 0.2f) + new Vector3d(7 - 0.1 * x, 7, 5), new Vector3d(-3 - Random.Range(0, 2f), -5, 0));
-        }
-
-        private void CreatePenetrateWall()
-        {
-            for (int x = 0; x < 10; ++x)
-                for (int y = 0; y < 10; ++y)
-                        sphSolver.CreateParticle(1, new Vector3d(4 + 0.2 * x, 4 + 0.2 * y, 5), Vector3d.zero);
-
-            for (int z = 0; z < 10; ++z)
-                sphSolver.CreateParticle(1, new Vector3d(5, 5, 1 + 0.05 * z), new Vector3d(0, 0, 5 + Random.Range(0, 2f)));
-        }
-
         #endregion
 
-        private IEnumerator SimulatorOnGPU_CR()
+        private void Update()
         {
-            HashSet<Int3> currUpdateMCBlocks = new HashSet<Int3>();
-            while (true)
+            _timer += Time.deltaTime;
+            if (_timer > updateInterval)
             {
-                yield return new WaitForSeconds(updateInterval);
-                //yield return null;
-                //if (!Input.GetKeyDown(KeyCode.S))
-                    //continue;
-                //Debug.Log("wa");
-                //#if UNITY_EDITOR
-                //                float startTime = Time.realtimeSinceStartup;
-                //#endif
+                _timer -= updateInterval;
                 sphSolver.StepOnGPU();
-                //update MarchingCubeEngine
-                currUpdateMCBlocks.Clear();
+                _currUpdateMCBlocks.Clear();
                 for (int i = 0; i < sphSolver.currParticleNum; ++i)
                 {
                     if (sphSolver._allCSParticlesContainer[i].onSurface)
@@ -163,48 +94,10 @@ namespace SPHFluid
                         Vector3 blockOffset = (sphSolver._allCSParticlesContainer[i].position /*- mcEngine.engineOrigin*/) /
                                                 (mcEngine.engineScale * MarchingCubeEngine.blockSize);
                         Int3 blockIdx = new Int3(Mathf.FloorToInt(blockOffset.x), Mathf.FloorToInt(blockOffset.y), Mathf.FloorToInt(blockOffset.z));
-                        currUpdateMCBlocks.Add(blockIdx);
+                        _currUpdateMCBlocks.Add(blockIdx);
                     }
                 }
-
-                //#if UNITY_EDITOR
-                //                print("Time taken: " + (Time.realtimeSinceStartup - startTime) * 1000.0f);
-                //#endif
-                mcEngine.BatchUpdate(new List<Int3>(currUpdateMCBlocks));
-            }
-        }
-        
-
-        private IEnumerator Simulate_CR()
-        {
-            HashSet<Int3> currUpdateMCBlocks = new HashSet<Int3>(); 
-            while (true)
-            {
-                yield return new WaitForSeconds(updateInterval);
-                //yield return null;
-                //if (!Input.GetKeyDown(KeyCode.S))
-                //    continue;
-
-//#if UNITY_EDITOR
-//                float startTime = Time.realtimeSinceStartup;
-//#endif
-                sphSolver.Step();
-                //update MarchingCubeEngine
-                currUpdateMCBlocks.Clear();
-                for (int i = 0; i < sphSolver.currParticleNum; ++i)
-                {                
-                    if (sphSolver.allParticles[i].onSurface)
-                    {
-                        Vector3d blockOffset = (sphSolver.allParticles[i].position /*- mcEngine.engineOrigin*/) / 
-                                                (mcEngine.engineScale * MarchingCubeEngine.blockSize);
-                        currUpdateMCBlocks.Add(Vector3d.FloorToInt3(blockOffset));
-                    }
-                }
-
-                //#if UNITY_EDITOR
-                //                print("Time taken: " + (Time.realtimeSinceStartup - startTime) * 1000.0f);
-                //#endif
-                mcEngine.BatchUpdate(new List<Int3>(currUpdateMCBlocks));
+                mcEngine.BatchUpdate(new List<Int3>(_currUpdateMCBlocks));
             }
         }
 
@@ -216,18 +109,6 @@ namespace SPHFluid
             Vector3 center = transform.position + extent;
             Gizmos.DrawWireCube(center, extent * 2);
             Gizmos.color = Color.white;
-
-            //if (sphSolver != null && sphSolver.allParticles != null && sphSolver.allParticles.Count > 0)
-            //{
-            //    for (int i = 0; i < sphSolver.allParticles.Count; ++i)
-            //    {
-            //        Vector3 pos = transform.position;
-            //        pos += new Vector3((float)sphSolver.allParticles[i].position.x,
-            //            (float)sphSolver.allParticles[i].position.y,
-            //            (float)sphSolver.allParticles[i].position.z);
-            //        Gizmos.DrawWireSphere(pos, 0.2f);
-            //    }
-            //}
 
             //if (sphSolver != null && sphSolver._allCSParticlesContainer != null && sphSolver._allCSParticlesContainer.Length > 0)
             //{

@@ -79,7 +79,6 @@ namespace SPHFluid
 
         public int maxParticleNum;
         public int currParticleNum { get { return allCSParticles.Count; } }
-        public List<SPHParticle> allParticles { get; private set; }
 
         public double timeStep;
         public double kernelRadius;
@@ -96,8 +95,6 @@ namespace SPHFluid
         public Int3 gridSize;
         public int gridCountXYZ, gridCountXY, gridCountXZ, gridCountYZ;
         public SPHGridCell[] grid;
-
-        public bool isSolving { get; private set; }
 
         #region GPU Adaptation
         public List<CSParticle> allCSParticles;
@@ -130,8 +127,7 @@ namespace SPHFluid
                         ComputeShader shaderRadixSort)
         {
             this.maxParticleNum = maxParticleNum;
-            allParticles = new List<SPHParticle>();
-            allParticles.Capacity = maxParticleNum;
+
             allCSParticles = new List<CSParticle>();
             allCSParticles.Capacity = maxParticleNum;
 
@@ -190,212 +186,11 @@ namespace SPHFluid
             _shaderSPH.SetFloat("_Eps", (float)MathHelper.Eps);
 
             _shaderRadixSort = shaderRadixSort;
-
-            isSolving = false;
-        }
-
-        public Int3 FindCellIdx(Vector3d pos)
-        {
-            pos /= kernelRadius;
-            return new Int3((int)Math.Floor(pos.x), (int)Math.Floor(pos.y), (int)Math.Floor(pos.z));
-        }
-
-        public List<Int3> FindNeighborSpace(Int3 idx)
-        {
-            if (idx._x < 0 || idx._x >= gridSize._x ||
-                idx._y < 0 || idx._y >= gridSize._y ||
-                idx._z < 0 || idx._z >= gridSize._z)
-                return null;
-
-            List<Int3> output = new List<Int3>() { idx };
-            if (idx._x > 0)
-                output.Add(new Int3(idx._x - 1, idx._y, idx._z));
-            if (idx._y > 0)
-                output.Add(new Int3(idx._x, idx._y - 1, idx._z));
-            if (idx._z > 0)
-                output.Add(new Int3(idx._x, idx._y, idx._z - 1));
-
-            if (idx._x < gridSize._x - 1)
-                output.Add(new Int3(idx._x + 1, idx._y, idx._z));
-            if (idx._y < gridSize._y - 1)
-                output.Add(new Int3(idx._x, idx._y + 1, idx._z));
-            if (idx._z < gridSize._z - 1)
-                output.Add(new Int3(idx._x, idx._y, idx._z + 1));
-
-            if (idx._x > 0 && idx._y > 0)
-                output.Add(new Int3(idx._x - 1, idx._y - 1, idx._z));
-            if (idx._y > 0 && idx._z > 0)
-                output.Add(new Int3(idx._x, idx._y - 1, idx._z - 1));
-            if (idx._x > 0 && idx._z > 0)
-                output.Add(new Int3(idx._x - 1, idx._y, idx._z - 1));
-
-            if (idx._x < gridSize._x - 1 && idx._y < gridSize._y - 1)
-                output.Add(new Int3(idx._x + 1, idx._y + 1, idx._z));
-            if (idx._y < gridSize._y - 1 && idx._z < gridSize._z - 1)
-                output.Add(new Int3(idx._x, idx._y + 1, idx._z + 1));
-            if (idx._x < gridSize._x - 1 && idx._z < gridSize._z - 1)
-                output.Add(new Int3(idx._x + 1, idx._y, idx._z + 1));
-
-            if (idx._x > 0 && idx._y < gridSize._y - 1)
-                output.Add(new Int3(idx._x - 1, idx._y + 1, idx._z));
-            if (idx._y > 0 && idx._z < gridSize._z - 1)
-                output.Add(new Int3(idx._x, idx._y - 1, idx._z + 1));
-            if (idx._x > 0 && idx._z < gridSize._z - 1)
-                output.Add(new Int3(idx._x - 1, idx._y, idx._z + 1));
-
-            if (idx._x < gridSize._x - 1 && idx._y > 0)
-                output.Add(new Int3(idx._x + 1, idx._y - 1, idx._z));
-            if (idx._y < gridSize._y - 1 && idx._z > 0)
-                output.Add(new Int3(idx._x, idx._y + 1, idx._z - 1));
-            if (idx._x < gridSize._x - 1 && idx._z > 0)
-                output.Add(new Int3(idx._x + 1, idx._y, idx._z - 1));
-
-            if (idx._x > 0 && idx._y > 0 && idx._z > 0)
-                output.Add(new Int3(idx._x - 1, idx._y - 1, idx._z - 1));
-
-            if (idx._x < gridSize._x - 1 && idx._y > 0 && idx._z > 0)
-                output.Add(new Int3(idx._x + 1, idx._y - 1, idx._z - 1));
-            if (idx._x > 0 && idx._y < gridSize._y - 1 && idx._z > 0)
-                output.Add(new Int3(idx._x - 1, idx._y + 1, idx._z - 1));
-            if (idx._x > 0 && idx._y > 0 && idx._z < gridSize._z - 1)
-                output.Add(new Int3(idx._x - 1, idx._y - 1, idx._z + 1));
-
-            if (idx._x < gridSize._x - 1 && idx._y < gridSize._y - 1 && idx._z > 0)
-                output.Add(new Int3(idx._x + 1, idx._y + 1, idx._z - 1));
-            if (idx._x > 0 && idx._y < gridSize._y - 1 && idx._z < gridSize._z - 1)
-                output.Add(new Int3(idx._x - 1, idx._y + 1, idx._z + 1));
-            if (idx._x < gridSize._x - 1 && idx._y > 0 && idx._z < gridSize._z - 1)
-                output.Add(new Int3(idx._x + 1, idx._y - 1, idx._z + 1));
-
-            if (idx._x < gridSize._x - 1 && idx._y < gridSize._y - 1 && idx._z < gridSize._z - 1)
-                output.Add(new Int3(idx._x + 1, idx._y + 1, idx._z + 1));
-
-            return output;
-        }
-
-        public void FindNeighborSpace(SPHParticle particle)
-        {
-            particle.neighborSpace.Clear();
-            Int3 idx = particle.cell.cellIdx;
-
-            if (idx._x < 0 || idx._x >= gridSize._x ||
-                idx._y < 0 || idx._y >= gridSize._y ||
-                idx._z < 0 || idx._z >= gridSize._z)
-                return;
-
-            particle.neighborSpace.Add(idx);
-
-            if (idx._x > 0)
-                particle.neighborSpace.Add(new Int3(idx._x - 1, idx._y, idx._z));
-            if (idx._y > 0)
-                particle.neighborSpace.Add(new Int3(idx._x, idx._y - 1, idx._z));
-            if (idx._z > 0)
-                particle.neighborSpace.Add(new Int3(idx._x, idx._y, idx._z - 1));
-
-            if (idx._x < gridSize._x - 1)
-                particle.neighborSpace.Add(new Int3(idx._x + 1, idx._y, idx._z));
-            if (idx._y < gridSize._y - 1)
-                particle.neighborSpace.Add(new Int3(idx._x, idx._y + 1, idx._z));
-            if (idx._z < gridSize._z - 1)
-                particle.neighborSpace.Add(new Int3(idx._x, idx._y, idx._z + 1));
-
-            if (idx._x > 0 && idx._y > 0)
-                particle.neighborSpace.Add(new Int3(idx._x - 1, idx._y - 1, idx._z));
-            if (idx._y > 0 && idx._z > 0)
-                particle.neighborSpace.Add(new Int3(idx._x, idx._y - 1, idx._z - 1));
-            if (idx._x > 0 && idx._z > 0)
-                particle.neighborSpace.Add(new Int3(idx._x - 1, idx._y, idx._z - 1));
-
-            if (idx._x < gridSize._x - 1 && idx._y < gridSize._y - 1)
-                particle.neighborSpace.Add(new Int3(idx._x + 1, idx._y + 1, idx._z));
-            if (idx._y < gridSize._y - 1 && idx._z < gridSize._z - 1)
-                particle.neighborSpace.Add(new Int3(idx._x, idx._y + 1, idx._z + 1));
-            if (idx._x < gridSize._x - 1 && idx._z < gridSize._z - 1)
-                particle.neighborSpace.Add(new Int3(idx._x + 1, idx._y, idx._z + 1));
-
-            if (idx._x > 0 && idx._y < gridSize._y - 1)
-                particle.neighborSpace.Add(new Int3(idx._x - 1, idx._y + 1, idx._z));
-            if (idx._y > 0 && idx._z < gridSize._z - 1)
-                particle.neighborSpace.Add(new Int3(idx._x, idx._y - 1, idx._z + 1));
-            if (idx._x > 0 && idx._z < gridSize._z - 1)
-                particle.neighborSpace.Add(new Int3(idx._x - 1, idx._y, idx._z + 1));
-
-            if (idx._x < gridSize._x - 1 && idx._y > 0)
-                particle.neighborSpace.Add(new Int3(idx._x + 1, idx._y - 1, idx._z));
-            if (idx._y < gridSize._y - 1 && idx._z > 0)
-                particle.neighborSpace.Add(new Int3(idx._x, idx._y + 1, idx._z - 1));
-            if (idx._x < gridSize._x - 1 && idx._z > 0)
-                particle.neighborSpace.Add(new Int3(idx._x + 1, idx._y, idx._z - 1));
-
-            if (idx._x > 0 && idx._y > 0 && idx._z > 0)
-                particle.neighborSpace.Add(new Int3(idx._x - 1, idx._y - 1, idx._z - 1));
-
-            if (idx._x < gridSize._x - 1 && idx._y > 0 && idx._z > 0)
-                particle.neighborSpace.Add(new Int3(idx._x + 1, idx._y - 1, idx._z - 1));
-            if (idx._x > 0 && idx._y < gridSize._y - 1 && idx._z > 0)
-                particle.neighborSpace.Add(new Int3(idx._x - 1, idx._y + 1, idx._z - 1));
-            if (idx._x > 0 && idx._y > 0 && idx._z < gridSize._z - 1)
-                particle.neighborSpace.Add(new Int3(idx._x - 1, idx._y - 1, idx._z + 1));
-
-            if (idx._x < gridSize._x - 1 && idx._y < gridSize._y - 1 && idx._z > 0)
-                particle.neighborSpace.Add(new Int3(idx._x + 1, idx._y + 1, idx._z - 1));
-            if (idx._x > 0 && idx._y < gridSize._y - 1 && idx._z < gridSize._z - 1)
-                particle.neighborSpace.Add(new Int3(idx._x - 1, idx._y + 1, idx._z + 1));
-            if (idx._x < gridSize._x - 1 && idx._y > 0 && idx._z < gridSize._z - 1)
-                particle.neighborSpace.Add(new Int3(idx._x + 1, idx._y - 1, idx._z + 1));
-
-            if (idx._x < gridSize._x - 1 && idx._y < gridSize._y - 1 && idx._z < gridSize._z - 1)
-                particle.neighborSpace.Add(new Int3(idx._x + 1, idx._y + 1, idx._z + 1));
-        }
-
-        public bool CreateParticle(double mass, Vector3d initPos, Vector3d initVelo, out SPHParticle particle)
-        {
-            if (currParticleNum >= maxParticleNum || isSolving)
-            {
-                particle = null;
-                return false;
-            }
-
-            particle = new SPHParticle();
-            allParticles.Add(particle);
-            particle.mass = mass;
-            particle.invMass = 1 / mass;
-            particle.position = initPos;
-            particle.velocity = initVelo;
-            particle.midVelocity = initVelo;
-            particle.prevVelocity = initVelo;
-
-            Int3 cellIdx = FindCellIdx(initPos);
-            SPHGridCell cell = grid[cellIdx._x * gridCountYZ + cellIdx._y * gridSize._z + cellIdx._z];
-            cell.particles.Add(particle);
-            particle.cell = cell;
-            return true;
-        }
-
-        public bool CreateParticle(double mass, Vector3d initPos, Vector3d initVelo)
-        {
-            if (currParticleNum >= maxParticleNum || isSolving)
-                return false;
-
-            SPHParticle particle = new SPHParticle();
-            allParticles.Add(particle);
-            particle.mass = mass;
-            particle.invMass = 1 / mass;
-            particle.position = initPos;
-            particle.velocity = initVelo;
-            particle.midVelocity = initVelo;
-            particle.prevVelocity = initVelo;
-
-            Int3 cellIdx = FindCellIdx(initPos);
-            SPHGridCell cell = grid[cellIdx._x * gridCountYZ + cellIdx._y * gridSize._z + cellIdx._z];
-            cell.particles.Add(particle);
-            particle.cell = cell;
-            return true;
         }
 
         public bool CreateGPUParticle(float mass, Vector3 initPos, Vector3 initVelo)
         {
-            if (currParticleNum >= maxParticleNum || isSolving)
+            if (currParticleNum >= maxParticleNum)
                 return false;
 
             allCSParticles.Add(new CSParticle(mass, initPos, initVelo));
@@ -403,207 +198,10 @@ namespace SPHFluid
             return true;
         }
 
-        public void UpdateParticlePressure(SPHParticle particle)
-        {
-            //density & pressure
-            particle.density = 0;
-            //List<Int3> adjacentCells = FindAdjacentCells(particle.currData.cell.cellIdx);
-            for (int n = 0; n < particle.neighborSpace.Count; ++n)
-            {
-                SPHGridCell cell =
-                    grid[particle.neighborSpace[n]._x * gridCountYZ +
-                    particle.neighborSpace[n]._y * gridSize._z +
-                    particle.neighborSpace[n]._z];
-
-                foreach (SPHParticle neighbor in cell.particles)
-                    particle.density += neighbor.mass * KernelPoly6(particle.position - neighbor.position);
-
-            }
-
-            particle.pressure = stiffness * (particle.density - restDensity);
-        }
-
-        public void UpdateParticleFluidForce(SPHParticle particle)
-        {
-            //force: pressure & viscosity & tension
-            particle.forcePressure = Vector3d.zero;
-            particle.forceViscosity = Vector3d.zero;
-            particle.forceTension = Vector3d.zero;
-            particle.colorGradient = Vector3d.zero;
-            particle.onSurface = false;
-
-            double tension = 0;
-
-            for (int n = 0; n < particle.neighborSpace.Count; ++n)
-            {
-                SPHGridCell cell =
-                    grid[particle.neighborSpace[n]._x * gridCountYZ +
-                    particle.neighborSpace[n]._y * gridSize._z +
-                    particle.neighborSpace[n]._z];
-
-                foreach (SPHParticle neighbor in cell.particles)
-                {
-                    if (!ReferenceEquals(particle, neighbor))
-                    {
-                        particle.forcePressure -= 0.5f * neighbor.mass * (particle.pressure + neighbor.pressure) / neighbor.density *
-                                       GradKernelSpiky(particle.position - neighbor.position);
-
-                        particle.forceViscosity += viscosity * neighbor.mass *
-                                           (neighbor.velocity - particle.velocity) / neighbor.density *
-                                           LaplacianKernelViscosity(particle.position - neighbor.position);
-                    }
-                    particle.colorGradient += neighbor.mass / neighbor.density * GradKernelPoly6(particle.position - neighbor.position);
-                    tension -= neighbor.mass / neighbor.density * LaplacianKernelPoly6(particle.position - neighbor.position);
-                }
-            }
-
-            if (particle.colorGradient.sqrMagnitude > surfaceThreshold * surfaceThreshold)
-            {
-                particle.onSurface = true;
-                particle.forceTension = tensionCoef * tension * particle.colorGradient.normalized;
-            }
-        }
-
-        public void ApplyBoundaryCondition(SPHParticle particle)
-        {
-            //simple cube boundary
-            Int3 nextIdx = FindCellIdx(particle.position);
-            bool collision = false;
-            Vector3d contact = particle.position;
-            Vector3d contactNormal = Vector3d.zero;
-            if (nextIdx._x < 0)
-            {
-                collision = true;
-                contact.x = MathHelper.Eps;
-                contactNormal.x -= 1;
-            }
-            if (nextIdx._x >= gridSize._x)
-            {
-                collision = true;
-                contact.x = gridSize._x * kernelRadius - MathHelper.Eps;
-                contactNormal.x += 1;
-            }
-            if (nextIdx._y < 0)
-            {
-                collision = true;
-                contact.y = MathHelper.Eps;
-                contactNormal.y -= 1;
-            }
-            if (nextIdx._y >= gridSize._y)
-            {
-                collision = true;
-                contact.y = gridSize._y * kernelRadius - MathHelper.Eps;
-                contactNormal.y += 1;
-            }
-            if (nextIdx._z < 0)
-            {
-                collision = true;
-                contact.z = MathHelper.Eps;
-                contactNormal.z -= 1;
-            }
-            if (nextIdx._z >= gridSize._z)
-            {
-                collision = true;
-                contact.z = gridSize._z * kernelRadius - MathHelper.Eps;
-                contactNormal.z += 1;
-            }
-
-            if (collision)
-            {
-                contactNormal.Normalize();
-                Vector3d proj = Vector3d.Dot(particle.midVelocity, contactNormal) * contactNormal;
-                particle.position = contact;
-                particle.velocity -= (1 + 0.5) * proj;
-                particle.midVelocity = 0.5 * (particle.velocity + particle.prevVelocity);
-            }
-
-        }
-
-        public void Init()
-        {
-            isSolving = true;
-            for (int i = 0; i < currParticleNum; ++i)
-                FindNeighborSpace(allParticles[i]);
-            for (int i = 0; i < currParticleNum; ++i)
-                UpdateParticlePressure(allParticles[i]);
-            for (int i = 0; i < currParticleNum; ++i)
-            {
-                SPHParticle curr = allParticles[i];
-                UpdateParticleFluidForce(curr);
-                Vector3d acc = curr.invMass * (curr.forcePressure + curr.forceViscosity + curr.forceTension);
-                acc += externalAcc;
-                curr.velocity += 0.5 * acc * timeStep;
-            }
-            isSolving = false;
-        }
-
-        public void Step()
-        {
-            isSolving = true;
-            for (int i = 0; i < currParticleNum; ++i)
-                FindNeighborSpace(allParticles[i]);
-            for (int i = 0; i < currParticleNum; ++i)
-                UpdateParticlePressure(allParticles[i]);
-            for (int i = 0; i < currParticleNum; ++i)
-            {
-                SPHParticle curr = allParticles[i];
-                UpdateParticleFluidForce(curr);
-                Vector3d acc = curr.invMass * (curr.forcePressure + curr.forceViscosity + curr.forceTension);
-                acc += externalAcc;
-                //leap frog integration
-                curr.position = curr.position + curr.velocity * timeStep;
-                curr.prevVelocity = curr.velocity;
-                curr.velocity = curr.velocity + acc * timeStep;
-                curr.midVelocity = 0.5 * (curr.velocity + curr.prevVelocity);
-                ApplyBoundaryCondition(curr);
-
-                //cell update
-                Int3 nextIdx = FindCellIdx(curr.position);
-
-                if (!curr.cell.cellIdx.Equals(nextIdx))
-                {
-                    curr.cell.particles.Remove(curr);
-                    curr.cell = grid[nextIdx._x * gridCountYZ + nextIdx._y * gridSize._z + nextIdx._z];
-                    curr.cell.particles.Add(curr);
-                }
-            }
-
-            isSolving = false;
-        }
-
-        public void SampleSurface(Vector3d pos, out double value, out Vector3d normal)
-        {
-            value = 0;
-            normal = Vector3d.zero;
-            List<Int3> neighborSpace = FindNeighborSpace(FindCellIdx(pos));
-            for (int n = 0; n < neighborSpace.Count; ++n)
-            {
-                SPHGridCell cell = grid[neighborSpace[n]._x * gridCountYZ +
-                                    neighborSpace[n]._y * gridSize._z +
-                                    neighborSpace[n]._z];
-                foreach (SPHParticle neighbor in cell.particles)
-                {
-                    value += neighbor.mass / neighbor.density * KernelPoly6(pos - neighbor.position);
-                    normal += neighbor.mass / neighbor.density * GradKernelPoly6(pos - neighbor.position);
-                }
-
-            }
-
-            if (value > 0)
-            {
-                value -= surfaceThreshold;
-                normal.Normalize();
-                normal *= -1;
-            }
-            else
-                value = -surfaceThreshold;
-        }
-
         public void InitOnGPU()
         {
             _GPUSorter = new GPURadixSortParticles(_shaderRadixSort, currParticleNum);
 
-            isSolving = true;
             _shaderSPH.SetInt("_ParticleNum", currParticleNum);
 
             _allCSParticlesContainer = allCSParticles.ToArray();
@@ -630,11 +228,6 @@ namespace SPHFluid
 
             _GPUSorter.Init(_bufferParticles);
             _GPUSorter.Sort();
-
-            //_bufferParticles.GetData(_allCSParticlesContainer);
-            ////sort based on cellIdx1d
-            //Array.Sort(_allCSParticlesContainer, CSParticleComparer.comparerInst);
-            //_bufferParticles.SetData(_allCSParticlesContainer);
 
             _bufferParticleNumPerCell.GetData(_particleStartIndexPerCell);
             int startIdx = 0;
@@ -674,15 +267,11 @@ namespace SPHFluid
 
             _shaderSPH.Dispatch(_kernelIp, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
 
-            _bufferParticles.GetData(_allCSParticlesContainer);
-
-            isSolving = false;
+            //_bufferParticles.GetData(_allCSParticlesContainer);
         }
 
         public void StepOnGPU()
         {
-            isSolving = true;
-
             _shaderSPH.SetBuffer(_kernelFns, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
             _shaderSPH.SetBuffer(_kernelFns, "_ParticleNumPerCell", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelFns, "_Particles", _bufferParticles);
@@ -722,11 +311,6 @@ namespace SPHFluid
             _GPUSorter.Init(_bufferParticles);
             _GPUSorter.Sort();
 
-            //_bufferParticles.GetData(_allCSParticlesContainer);
-            ////sort based on cellIdx1d
-            //Array.Sort(_allCSParticlesContainer, CSParticleComparer.comparerInst);
-            //_bufferParticles.SetData(_allCSParticlesContainer);
-
             _bufferParticleNumPerCell.GetData(_particleStartIndexPerCell);
             int startIdx = 0;
             for (int i = 0; i < gridCountXYZ + 1; ++i)
@@ -737,7 +321,7 @@ namespace SPHFluid
             }
             _bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
 
-            isSolving = false;
+            //_bufferParticles.GetData(_allCSParticlesContainer);
         }
 
         public void Free()
