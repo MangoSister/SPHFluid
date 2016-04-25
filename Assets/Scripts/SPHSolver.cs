@@ -110,14 +110,16 @@ namespace SPHFluid
         private int _kernelIp;
 
         public const int sphThreadGroupSize = 512;
-        private int _sphthreadGroupNum;
+        public int _sphthreadGroupNum;
 
         public ComputeBuffer _bufferParticles;
         private ComputeBuffer _bufferNeighborSpace;
         public ComputeBuffer _bufferParticleNumPerCell;
         private ComputeBuffer _bufferParticlePrefixLocalOffset;
+
         private bool[] _neighborSpaceInit;
         private int[] _particleNumPerCellInit;
+        private int[] _surfaceBlocksInit;
 
         public const int scanCellNumThreadGroupSize = 512;
         private int _scanThreadGroupNum;
@@ -125,7 +127,7 @@ namespace SPHFluid
         private ComputeShader _shaderRadixSort;
         private GPURadixSortParticles _GPUSorter;
 
-        #endregion
+        #endregion 
 
         public SPHSolver(int maxParticleNum, double timeStep, double kernelRadius,
                         double stiffness, double restDensity, Vector3d externalAcc,

@@ -235,3 +235,4 @@ void InitParticle (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 
 	_Particles[flatIdx]._velocity += 0.5 * acc * _TimeStep;
 }
+

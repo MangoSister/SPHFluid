@@ -94,7 +94,9 @@ namespace SPHFluid.Render
         //world pos -> voxel index (space): (world pos - engineOrigin) / engineScale
 
         public SPHSolver sphSolver;
-
+        private ComputeBuffer _bufferSufaceBlocks;
+        private int[] _surfaceBlocksInit;
+        private int _kernelCollectSurfaceBlock;
 #if UNITY_EDITOR
         public bool drawBlockWireFrames = false;
         public bool drawCellWireFrames = false;
@@ -164,6 +166,10 @@ namespace SPHFluid.Render
 
             this.sphSolver = sphSolver;
 
+            _bufferSufaceBlocks = new ComputeBuffer((width * height * length) / (blockSize * blockSize * blockSize), sizeof(int));
+            _surfaceBlocksInit = new int[(width * height * length) / (blockSize * blockSize * blockSize)];
+            _bufferSufaceBlocks.SetData(_surfaceBlocksInit);
+            _kernelCollectSurfaceBlock = shaderSample.FindKernel("CollectSurfaceBlock");
             //_bufferParticles = new ComputeBuffer(sphSolver.currParticleNum, CSParticle.stride);
             //_bufferParticlesStartIndex = new ComputeBuffer(sphSolver.gridCountXYZ + 1, sizeof(int));
 
@@ -218,6 +224,12 @@ namespace SPHFluid.Render
                 _bufferCornerToVertTable = null;
             }
 
+            if(_bufferSufaceBlocks != null)
+            {
+                _bufferSufaceBlocks.Release();
+                _bufferSufaceBlocks = null;
+            }
+
             //if (_bufferParticles != null)
             //{
             //    _bufferParticles.Release();
@@ -234,8 +246,8 @@ namespace SPHFluid.Render
         /// <summary>
         /// Batch update. Reconstruct all meshes needed by running GPU based Marching Cubes
         /// </summary>
-        public void BatchUpdate(List<Int3> nextUpdateblocks)
-        {
+        public void BatchUpdate(/*List<Int3> nextUpdateblocks*/)
+        { 
             for (int x = 0; x < width / blockSize; x++)
                 for (int y = 0; y < height / blockSize; y++)
                     for (int z = 0; z < length / blockSize; z++)
@@ -247,6 +259,24 @@ namespace SPHFluid.Render
                         //if (_blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh != null)
                         //    _blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh.Clear();
                     }
+
+            shaderSample.SetBuffer(_kernelCollectSurfaceBlock, "_Particles", sphSolver._bufferParticles);
+            shaderSample.SetBuffer(_kernelCollectSurfaceBlock, "_SurfaceMCBlocks", _bufferSufaceBlocks);
+            shaderSample.Dispatch(_kernelCollectSurfaceBlock, sphSolver._sphthreadGroupNum, 1, 1);
+            int[] surfaceBlocks = new int[(width * height * length) / (blockSize * blockSize * blockSize)];
+            _bufferSufaceBlocks.GetData(surfaceBlocks);
+            List<Int3> nextUpdateblocks = new List<Int3>();
+            int blockNumX = width / blockSize;
+            int blockNumY = height / blockSize;
+            int blockNumZ = length / blockSize;
+            for(int i = 0; i < surfaceBlocks.Length; ++i)
+            {
+                if(surfaceBlocks[i] == 1)
+                {
+                    //TODO
+                   // int x = 
+                }
+            }
 
             if (nextUpdateblocks.Count == 0)
                 return;
