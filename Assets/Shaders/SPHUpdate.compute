@@ -1,17 +1,18 @@
 ﻿#include "SPHInclude.compute"
 
 #pragma kernel ComputeCellIdx
+#pragma kernel ScanCellNumLocal
+#pragma kernel ScanCellNumGlobal
 #pragma kernel FindNeighborSpace
 #pragma kernel UpdatePressureDensity
 #pragma kernel UpdateParticleFluidForce
 #pragma kernel AdvanceParticle
 #pragma kernel InitParticle
 
-//Input
-StructuredBuffer<uint> _ParticleStartIndexPerCell;
-
 //Updating
-RWStructuredBuffer<uint> _ParticleNumPerCell;
+groupshared uint groupCellPrefixSum[CELL_SCAN_THREAD_NUM_3D];
+RWStructuredBuffer<uint> _ParticleCellNumPrefixSum;
+RWBuffer<uint> _ParticlePrefixLocalOffset; //[ceil(_SphGridSize_3D / CELL_SCAN_THREAD_NUM_3D)]
 RWStructuredBuffer<Particle> _Particles;
 RWStructuredBuffer<bool> _NeighborSpace;
 
@@ -27,8 +28,73 @@ void ComputeCellIdx (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 					 cellIdx.y * _SphGridSize.z + 
 					 cellIdx.z;
 	
-	InterlockedAdd(_ParticleNumPerCell[_Particles[flatIdx]._cellIdx1d],1);
+	InterlockedAdd(_ParticleCellNumPrefixSum[_Particles[flatIdx]._cellIdx1d],1);
 }
+
+[numthreads(CELL_SCAN_THREAD_NUM,CELL_SCAN_THREAD_NUM,CELL_SCAN_THREAD_NUM)]
+void ScanCellNumLocal (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
+{
+	//group number: ceil(_SphGridSize_3D / CELL_SCAN_THREAD_NUM_3D)
+	uint flatIdx = groupIdx + groupId.x * CELL_SCAN_THREAD_NUM_3D;
+	uint sphGridCellNum = _SphGridSize.x * _SphGridSize.y * _SphGridSize.z;
+	if(flatIdx < sphGridCellNum)
+		groupCellPrefixSum[groupIdx] = _ParticleCellNumPrefixSum[flatIdx];
+	else
+		groupCellPrefixSum[groupIdx] = 0;
+	GroupMemoryBarrierWithGroupSync();
+	
+	//parallel scan: up-sweep
+	int d = 0;
+	for(d = 0; d < LOG2_CELL_SCAN_THREAD_NUM_3D; ++d)
+	{
+		uint pow_2_d_1 = 1 << (d + 1);
+		if((groupIdx % pow_2_d_1) == 0)
+		{
+			groupCellPrefixSum[groupIdx + pow_2_d_1 - 1] +=
+			groupCellPrefixSum[groupIdx + (1 << d) - 1];
+		}
+		GroupMemoryBarrierWithGroupSync();
+	}
+
+	//parallel scan: set last element to zero
+	if(groupIdx == CELL_SCAN_THREAD_NUM_3D - 1)
+	{
+		_ParticlePrefixLocalOffset[groupId.x] = groupCellPrefixSum[groupIdx];
+		groupCellPrefixSum[groupIdx] = 0;	
+	}
+	GroupMemoryBarrierWithGroupSync();
+
+	//parallel scan: down-sweep
+	for(d = LOG2_CELL_SCAN_THREAD_NUM_3D - 1; d >= 0; --d)
+	{
+		uint pow_2_d_1 = 1 << (d + 1);
+		uint pow_2_d = (1 << d);
+		if((groupIdx % pow_2_d_1) == 0)
+		{
+			uint old = groupCellPrefixSum[groupIdx + pow_2_d - 1];
+			groupCellPrefixSum[groupIdx + pow_2_d - 1] = 
+			groupCellPrefixSum[groupIdx + pow_2_d_1 - 1];
+			groupCellPrefixSum[groupIdx + pow_2_d_1 - 1] += old;
+		}
+		GroupMemoryBarrierWithGroupSync();
+	}
+
+	//write back to global
+	if(flatIdx < sphGridCellNum)
+		 _ParticleCellNumPrefixSum[flatIdx] = groupCellPrefixSum[groupIdx];
+}
+
+[numthreads(CELL_SCAN_THREAD_NUM,CELL_SCAN_THREAD_NUM,CELL_SCAN_THREAD_NUM)]
+void ScanCellNumGlobal (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
+{
+	//group number: ceil(_SphGridSize_3D / CELL_SCAN_THREAD_NUM_3D)
+	uint groupOffset = 0;
+	for(uint i = 0; i < groupId.x; ++i)
+		groupOffset += _ParticlePrefixLocalOffset[i];
+	uint flatIdx = groupIdx + groupId.x * CELL_SCAN_THREAD_NUM_3D;
+	_ParticleCellNumPrefixSum[flatIdx] += groupOffset;
+}
+
 
 [numthreads(SPH_THREAD_NUM,SPH_THREAD_NUM,SPH_THREAD_NUM)]
 void FindNeighborSpace (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
@@ -65,8 +131,8 @@ void UpdatePressureDensity (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_Gro
 								neighborOffset[i].y * _SphGridSize.z + 
 								neighborOffset[i].z;
 
-		uint start = _ParticleStartIndexPerCell[neighborIdx1d];
-		uint end = _ParticleStartIndexPerCell[neighborIdx1d + 1]; //last element? -> one more element
+		uint start = _ParticleCellNumPrefixSum[neighborIdx1d];
+		uint end = _ParticleCellNumPrefixSum[neighborIdx1d + 1]; //last element? -> one more element
 		for(uint n = start; n < end; ++n)
 		{
 			float3 relativePos = _Particles[flatIdx]._position - _Particles[n]._position;
@@ -103,8 +169,8 @@ void UpdateParticleFluidForce (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_
 								neighborOffset[i].y * _SphGridSize.z + 
 								neighborOffset[i].z;
 			
-		uint start = _ParticleStartIndexPerCell[neighborIdx1d];
-		uint end = _ParticleStartIndexPerCell[neighborIdx1d + 1]; //last element? -> one more element
+		uint start = _ParticleCellNumPrefixSum[neighborIdx1d];
+		uint end = _ParticleCellNumPrefixSum[neighborIdx1d + 1]; //last element? -> one more element
 		for(uint n = start; n < end; ++n)
 		{
 			float3 relativePos = _Particles[flatIdx]._position - _Particles[n]._position;

@@ -287,7 +287,7 @@ namespace SPHFluid.Render
             ComputeBuffer bufferNormals = new ComputeBuffer(nextUpdateblocks.Count * (ag1BlockSize) * (ag1BlockSize) * (ag1BlockSize), sizeof(float) * 3);
 
             shaderSample.SetBuffer(sampleKernel, "_Blocks", bufferBlocks);
-            shaderSample.SetBuffer(sampleKernel, "_ParticleStartIndexPerCell", sphSolver._bufferParticleStartIndexPerCell);
+            shaderSample.SetBuffer(sampleKernel, "_ParticleCellNumPrefixSum", sphSolver._bufferParticleNumPerCell);
             shaderSample.SetBuffer(sampleKernel, "_Particles", sphSolver._bufferParticles);
             shaderSample.SetBuffer(sampleKernel, "_Samples", bufferSamples);
             shaderSample.SetBuffer(sampleKernel, "_Normals", bufferNormals);

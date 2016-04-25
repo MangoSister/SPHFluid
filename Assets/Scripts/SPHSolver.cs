@@ -101,19 +101,26 @@ namespace SPHFluid
         public CSParticle[] _allCSParticlesContainer;
         private ComputeShader _shaderSPH;
         private int _kernelCci;
+        private int _kernelScanLocal;
+        private int _kernelScanGlobal;
         private int _kernelFns;
         private int _kernelUpd;
         private int _kernelUpff;
         private int _kernelAp;
         private int _kernelIp;
 
+        public const int sphThreadGroupSize = 512;
+        private int _sphthreadGroupNum;
+
         public ComputeBuffer _bufferParticles;
         private ComputeBuffer _bufferNeighborSpace;
-        private ComputeBuffer _bufferParticleNumPerCell;
-        public ComputeBuffer _bufferParticleStartIndexPerCell;
-        public int[] _particleStartIndexPerCell;
+        public ComputeBuffer _bufferParticleNumPerCell;
+        private ComputeBuffer _bufferParticlePrefixLocalOffset;
         private bool[] _neighborSpaceInit;
         private int[] _particleNumPerCellInit;
+
+        public const int scanCellNumThreadGroupSize = 512;
+        private int _scanThreadGroupNum;
 
         private ComputeShader _shaderRadixSort;
         private GPURadixSortParticles _GPUSorter;
@@ -163,6 +170,8 @@ namespace SPHFluid
             _shaderSPH = shaderSPH;
 
             _kernelCci = _shaderSPH.FindKernel("ComputeCellIdx");
+            _kernelScanLocal = _shaderSPH.FindKernel("ScanCellNumLocal");
+            _kernelScanGlobal = _shaderSPH.FindKernel("ScanCellNumGlobal");
             _kernelFns = _shaderSPH.FindKernel("FindNeighborSpace");
             _kernelUpd = _shaderSPH.FindKernel("UpdatePressureDensity");
             _kernelUpff = _shaderSPH.FindKernel("UpdateParticleFluidForce");
@@ -200,6 +209,8 @@ namespace SPHFluid
 
         public void InitOnGPU()
         {
+            _sphthreadGroupNum = Mathf.CeilToInt((float)currParticleNum / (float)sphThreadGroupSize);
+            _scanThreadGroupNum = Mathf.CeilToInt((float)gridCountXYZ / (float)scanCellNumThreadGroupSize);
             _GPUSorter = new GPURadixSortParticles(_shaderRadixSort, currParticleNum);
 
             _shaderSPH.SetInt("_ParticleNum", currParticleNum);
@@ -216,112 +227,108 @@ namespace SPHFluid
             _particleNumPerCellInit = new int[gridCountXYZ];
             _bufferParticleNumPerCell.SetData(_particleNumPerCellInit);
 
-            _bufferParticleStartIndexPerCell = new ComputeBuffer(gridCountXYZ + 1, sizeof(int));
-            _particleStartIndexPerCell = new int[gridCountXYZ + 1];
-            _bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
 
+            _bufferParticlePrefixLocalOffset = new ComputeBuffer(_scanThreadGroupNum , sizeof(int));
 
-            _shaderSPH.SetBuffer(_kernelCci, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelCci, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelCci, "_Particles", _bufferParticles);
 
-            _shaderSPH.Dispatch(_kernelCci, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+            _shaderSPH.Dispatch(_kernelCci, _sphthreadGroupNum, 1, 1);
 
             _GPUSorter.Init(_bufferParticles);
             _GPUSorter.Sort();
 
-            _bufferParticleNumPerCell.GetData(_particleStartIndexPerCell);
-            int startIdx = 0;
-            for (int i = 0; i < gridCountXYZ + 1; ++i)
-            {
-                int oldVal = _particleStartIndexPerCell[i];
-                _particleStartIndexPerCell[i] = startIdx;
-                startIdx += oldVal;
-            }
-            _bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
+            _shaderSPH.SetBuffer(_kernelScanLocal, "_ParticlePrefixLocalOffset", _bufferParticlePrefixLocalOffset);
+            _shaderSPH.SetBuffer(_kernelScanLocal, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
+            _shaderSPH.Dispatch(_kernelScanLocal, _scanThreadGroupNum, 1, 1);
 
-            _shaderSPH.SetBuffer(_kernelFns, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelFns, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelScanGlobal, "_ParticlePrefixLocalOffset", _bufferParticlePrefixLocalOffset);
+            _shaderSPH.SetBuffer(_kernelScanGlobal, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
+            _shaderSPH.Dispatch(_kernelScanGlobal, _scanThreadGroupNum, 1, 1);
+
+            //_bufferParticleNumPerCell.GetData(_particleStartIndexPerCell);
+            //int startIdx = 0;
+            //for (int i = 0; i < gridCountXYZ + 1; ++i)
+            //{
+            //    int oldVal = _particleStartIndexPerCell[i];
+            //    _particleStartIndexPerCell[i] = startIdx;
+            //    startIdx += oldVal;
+            //}
+            //_bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
+
+            _shaderSPH.SetBuffer(_kernelFns, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelFns, "_Particles", _bufferParticles);
             _shaderSPH.SetBuffer(_kernelFns, "_NeighborSpace", _bufferNeighborSpace);
 
-            _shaderSPH.Dispatch(_kernelFns, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+            _shaderSPH.Dispatch(_kernelFns, _sphthreadGroupNum, 1, 1);
 
-            _shaderSPH.SetBuffer(_kernelUpd, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelUpd, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelUpd, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelUpd, "_Particles", _bufferParticles);
             _shaderSPH.SetBuffer(_kernelUpd, "_NeighborSpace", _bufferNeighborSpace);
 
-            _shaderSPH.Dispatch(_kernelUpd, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+            _shaderSPH.Dispatch(_kernelUpd, _sphthreadGroupNum, 1, 1);
 
-            _shaderSPH.SetBuffer(_kernelUpff, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelUpff, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelUpff, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelUpff, "_Particles", _bufferParticles);
             _shaderSPH.SetBuffer(_kernelUpff, "_NeighborSpace", _bufferNeighborSpace);
 
-            _shaderSPH.Dispatch(_kernelUpff, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+            _shaderSPH.Dispatch(_kernelUpff, _sphthreadGroupNum, 1, 1);
 
-            _shaderSPH.SetBuffer(_kernelIp, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelIp, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelIp, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelIp, "_Particles", _bufferParticles);
             _shaderSPH.SetBuffer(_kernelIp, "_NeighborSpace", _bufferNeighborSpace);
 
-            _shaderSPH.Dispatch(_kernelIp, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+            _shaderSPH.Dispatch(_kernelIp, _sphthreadGroupNum, 1, 1);
 
-            //_bufferParticles.GetData(_allCSParticlesContainer);
+            _bufferParticles.GetData(_allCSParticlesContainer);
         }
 
         public void StepOnGPU()
         {
-            _shaderSPH.SetBuffer(_kernelFns, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelFns, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelFns, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelFns, "_Particles", _bufferParticles);
 
             _bufferNeighborSpace.SetData(_neighborSpaceInit);
             _shaderSPH.SetBuffer(_kernelFns, "_NeighborSpace", _bufferNeighborSpace);
 
-            _shaderSPH.Dispatch(_kernelFns, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+            _shaderSPH.Dispatch(_kernelFns, _sphthreadGroupNum, 1, 1);
 
-            _shaderSPH.SetBuffer(_kernelUpd, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelUpd, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelUpd, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelUpd, "_Particles", _bufferParticles);
             _shaderSPH.SetBuffer(_kernelUpd, "_NeighborSpace", _bufferNeighborSpace);
 
-            _shaderSPH.Dispatch(_kernelUpd, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+            _shaderSPH.Dispatch(_kernelUpd, _sphthreadGroupNum, 1, 1);
 
-            _shaderSPH.SetBuffer(_kernelUpff, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelUpff, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelUpff, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelUpff, "_Particles", _bufferParticles);
             _shaderSPH.SetBuffer(_kernelUpff, "_NeighborSpace", _bufferNeighborSpace);
 
-            _shaderSPH.Dispatch(_kernelUpff, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+            _shaderSPH.Dispatch(_kernelUpff, _sphthreadGroupNum, 1, 1);
 
-            _shaderSPH.SetBuffer(_kernelAp, "_ParticleStartIndexPerCell", _bufferParticleStartIndexPerCell);
-            _shaderSPH.SetBuffer(_kernelAp, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelAp, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelAp, "_Particles", _bufferParticles);
             _shaderSPH.SetBuffer(_kernelAp, "_NeighborSpace", _bufferNeighborSpace);
 
-            _shaderSPH.Dispatch(_kernelAp, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+            _shaderSPH.Dispatch(_kernelAp, _sphthreadGroupNum, 1, 1);
 
             _bufferParticleNumPerCell.SetData(_particleNumPerCellInit);
-            _shaderSPH.SetBuffer(_kernelCci, "_ParticleNumPerCell", _bufferParticleNumPerCell);
+            _shaderSPH.SetBuffer(_kernelCci, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelCci, "_Particles", _bufferParticles);
 
-            _shaderSPH.Dispatch(_kernelCci, Mathf.CeilToInt((float)currParticleNum / 1000f), 1, 1);
+            _shaderSPH.Dispatch(_kernelCci, _sphthreadGroupNum, 1, 1);
 
             _GPUSorter.Init(_bufferParticles);
             _GPUSorter.Sort();
 
-            _bufferParticleNumPerCell.GetData(_particleStartIndexPerCell);
-            int startIdx = 0;
-            for (int i = 0; i < gridCountXYZ + 1; ++i)
-            {
-                int oldVal = _particleStartIndexPerCell[i];
-                _particleStartIndexPerCell[i] = startIdx;
-                startIdx += oldVal;
-            }
-            _bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
+            _shaderSPH.SetBuffer(_kernelScanLocal, "_ParticlePrefixLocalOffset", _bufferParticlePrefixLocalOffset);
+            _shaderSPH.SetBuffer(_kernelScanLocal, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
+            _shaderSPH.Dispatch(_kernelScanLocal, _scanThreadGroupNum, 1, 1);
 
-            //_bufferParticles.GetData(_allCSParticlesContainer);
+            _shaderSPH.SetBuffer(_kernelScanGlobal, "_ParticlePrefixLocalOffset", _bufferParticlePrefixLocalOffset);
+            _shaderSPH.SetBuffer(_kernelScanGlobal, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
+            _shaderSPH.Dispatch(_kernelScanGlobal, _scanThreadGroupNum, 1, 1);
+
+            _bufferParticles.GetData(_allCSParticlesContainer);
         }
 
         public void Free()
@@ -344,10 +351,10 @@ namespace SPHFluid
                 _bufferParticles = null;
             }
 
-            if (_bufferParticleStartIndexPerCell != null)
+            if (_bufferParticlePrefixLocalOffset != null)
             {
-                _bufferParticleStartIndexPerCell.Release();
-                _bufferParticleStartIndexPerCell = null;
+                _bufferParticlePrefixLocalOffset.Release();
+                _bufferParticlePrefixLocalOffset = null;
             }
 
             _GPUSorter.Free();

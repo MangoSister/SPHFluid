@@ -121,7 +121,7 @@ void PrecedeScan (uint3 threadId : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 	}
 	GroupMemoryBarrierWithGroupSync();
 
-	////parallel scan: down-sweep
+	//parallel scan: down-sweep
 	for(d = LOG2_SORT_SECTION_SIZE_2D - 1; d >= 0; --d)
 	{
 		uint pow_2_d_1 = 1 << (d + 1);

@@ -3,7 +3,7 @@
 
 //Input
 StructuredBuffer<uint3> _Blocks;
-StructuredBuffer<uint> _ParticleStartIndexPerCell;
+StructuredBuffer<uint> _ParticleCellNumPrefixSum;
 StructuredBuffer<Particle> _Particles;
 
 //Output
@@ -44,8 +44,8 @@ void SampleFluid  (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 			uint neighborIdx1d = neighborIdx.x * _SphGridSize.y * _SphGridSize.z +
 								 neighborIdx.y * _SphGridSize.z + 
 								 neighborIdx.z;
-			uint start = _ParticleStartIndexPerCell[neighborIdx1d];
-			uint end = _ParticleStartIndexPerCell[neighborIdx1d + 1]; //last element? -> one more element
+			uint start = _ParticleCellNumPrefixSum[neighborIdx1d];
+			uint end = _ParticleCellNumPrefixSum[neighborIdx1d + 1]; //last element? -> one more element
 			for(uint n = start; n < end; ++n)
 			{
 				_Samples[outputIdx] += _Particles[n]._mass * _Particles[n]._inv_density * KernelPoly6(worldPos - _Particles[n]._position);

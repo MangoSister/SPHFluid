@@ -2,9 +2,15 @@
 #define SPH_INCLUDE
 
 /*** SPH Size ***/
-#define SPH_THREAD_NUM 10
-#define SPH_THREAD_NUM_2D 100
-#define SPH_THREAD_NUM_3D 1000
+#define SPH_THREAD_NUM 8
+#define SPH_THREAD_NUM_2D 64
+#define SPH_THREAD_NUM_3D 512
+
+/*** Cell Start Index Reduction Size ***/
+#define CELL_SCAN_THREAD_NUM 8
+#define CELL_SCAN_THREAD_NUM_2D 64
+#define CELL_SCAN_THREAD_NUM_3D 512
+#define LOG2_CELL_SCAN_THREAD_NUM_3D 9
 
 /*** Marching Cube Size ***/
 #define BLOCK_SIZE 8
