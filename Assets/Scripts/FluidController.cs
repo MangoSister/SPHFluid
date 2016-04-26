@@ -26,10 +26,9 @@ namespace SPHFluid
         [HideInInspector]
         public Int3 gridSize;
 
-        private HashSet<Int3> _currUpdateMCBlocks;
         private float _timer;
 
-        private void Start()
+        public void Init()
         {
             //ExampleMc()
             sphSolver = new SPHSolver(maxParticleNum, timeStep, kernelRadius,
@@ -37,24 +36,31 @@ namespace SPHFluid
                                         viscosity, tensionCoef, surfaceThreshold,
                                         gridSize._x, gridSize._y, gridSize._z, shaderSPH,
                                         shaderRadixSort);
-            
+
             //CreateTest125CubeGPU();
-            CreateTest1000CubeGPU();
-            
+            //CreateTest1000CubeGPU();
+            CreateTest8000CubeGPU();
             //sphSolver.Init();
             sphSolver.InitOnGPU();
 
             mcEngine.engineScale = (float)gridSize._x / (float)mcEngine.width;
             mcEngine.Init(sphSolver);
 
-            _currUpdateMCBlocks = new HashSet<Int3>();
+
             _timer = 0f;
+        }
+
+        public void Free()
+        {
+            if (sphSolver != null)
+                sphSolver.Free();
+            if (mcEngine != null)
+                mcEngine.Free();
         }
 
         private void OnDestroy()
         {
-            sphSolver.Free();
-            mcEngine.Free();
+            Free();
         }
 
         #region Test Cases
@@ -77,6 +83,16 @@ namespace SPHFluid
                         sphSolver.CreateGPUParticle(1, new Vector3(4f + 0.2f * x, 4f + 0.2f * y, 4f + 0.2f * z), Vector3.zero);
                     }
         }
+
+        private void CreateTest8000CubeGPU()
+        {
+            for (int x = 0; x < 20; ++x)
+                for (int y = 0; y < 20; ++y)
+                    for (int z = 0; z < 20; ++z)
+                    {
+                        sphSolver.CreateGPUParticle(1, new Vector3(0.01f + 0.49f * x, 0.01f + 0.49f * y, 0.01f + 0.49f * z), Vector3.zero);
+                    }
+        }
         #endregion
 
         private void Update()
@@ -86,18 +102,7 @@ namespace SPHFluid
             {
                 _timer -= updateInterval;
                 sphSolver.StepOnGPU();
-                _currUpdateMCBlocks.Clear();
-                for (int i = 0; i < sphSolver.currParticleNum; ++i)
-                {
-                    if (sphSolver._allCSParticlesContainer[i].onSurface)
-                    {
-                        Vector3 blockOffset = (sphSolver._allCSParticlesContainer[i].position /*- mcEngine.engineOrigin*/) /
-                                                (mcEngine.engineScale * MarchingCubeEngine.blockSize);
-                        Int3 blockIdx = new Int3(Mathf.FloorToInt(blockOffset.x), Mathf.FloorToInt(blockOffset.y), Mathf.FloorToInt(blockOffset.z));
-                        _currUpdateMCBlocks.Add(blockIdx);
-                    }
-                }
-                mcEngine.BatchUpdate(new List<Int3>(_currUpdateMCBlocks));
+                mcEngine.BatchUpdate();
             }
         }
 

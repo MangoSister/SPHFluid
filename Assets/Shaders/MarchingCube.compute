@@ -11,6 +11,8 @@ StructuredBuffer<int> _CornerToEdgeTable;
 RWBuffer<uint> _TriEndIndex;
 RWStructuredBuffer<Triangle> _Meshes;
 
+RWBuffer<uint> _TriBlockNum; // [MC engine dim 3d]
+groupshared uint triNumPerBlock;
 // edgeConnection lists the index of the endpoint vertices for each of the 12 edges of the cube
 static int2 edgeConnection[12] =
 {
@@ -76,65 +78,75 @@ float3 SampleNormalTrilinear(uint blockIdx, float3 coord)
 [numthreads(BLOCK_SIZE,BLOCK_SIZE,BLOCK_SIZE)]
 void MarchingCube (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 {
+	uint flatIdx = 	cellIdx.x +
+					cellIdx.y * BLOCK_SIZE +
+					cellIdx.z * BLOCK_SIZE_2D;
+	if(flatIdx == 0)
+		triNumPerBlock = 0;
+	GroupMemoryBarrierWithGroupSync();
 
 	uint blockIdx = groupId.x;
 	int cornerFlag = _CornerFlags
 							[
 								blockIdx * BLOCK_SIZE_3D +
-								cellIdx.x +
-								cellIdx.y * BLOCK_SIZE +
-								cellIdx.z * BLOCK_SIZE_2D
+								flatIdx
 							];
 
 	int edgeFlag = _CornerToEdgeTable[cornerFlag];
-	if(edgeFlag == 0)
-		return;
-
-	float cube[8];
-	FillCube(blockIdx, cellIdx, cube);
-
-	float3 meshVertices[12];
-	float3 cellMin = float3(cellIdx.x, cellIdx.y, cellIdx.z);
-	for(int e = 0; e < 12; e++)
+	if(edgeFlag != 0)
 	{
-		//if there is an intersection on this edge
-		if( (edgeFlag & (1 << e)) != 0)
+		float cube[8];
+		FillCube(blockIdx, cellIdx, cube);
+
+		float3 meshVertices[12];
+		float3 cellMin = float3(cellIdx.x, cellIdx.y, cellIdx.z);
+		for(int e = 0; e < 12; e++)
 		{
-			//linear interpolation
-			//get zero point
-			float t = (/*0*/-cube[edgeConnection[e].x]) / (cube[edgeConnection[e].y] - cube[edgeConnection[e].x]);
-			meshVertices[e] = lerp(cellMin + vertexOffset[edgeConnection[e].x],
-									cellMin + vertexOffset[edgeConnection[e].y],
-									t);
+			//if there is an intersection on this edge
+			if( (edgeFlag & (1 << e)) != 0)
+			{
+				//linear interpolation
+				//get zero point
+				float t = (/*0*/-cube[edgeConnection[e].x]) / (cube[edgeConnection[e].y] - cube[edgeConnection[e].x]);
+				meshVertices[e] = lerp(cellMin + vertexOffset[edgeConnection[e].x],
+										cellMin + vertexOffset[edgeConnection[e].y],
+										t);
 
+			}
 		}
-	}
 
 
-	for(int i = 0; i < 5; i++)
-	{
-		if(_CornerToVertTable[cornerFlag * 15 + i * 3] >= 0)
+		for(int i = 0; i < 5; i++)
 		{
-			Triangle tri;
-			tri._block = blockIdx;
+			if(_CornerToVertTable[cornerFlag * 15 + i * 3] >= 0)
+			{
+				Triangle tri;
+				tri._block = blockIdx;
+				InterlockedAdd(triNumPerBlock, 1);
 
-			float3 curr;
-			curr = meshVertices[_CornerToVertTable[cornerFlag * 15 + i * 3 + 0]];
-			tri._position0 = curr;
-			tri._normal0 = SampleNormalTrilinear(blockIdx, curr);
+				float3 curr;
+				curr = meshVertices[_CornerToVertTable[cornerFlag * 15 + i * 3 + 0]];
+				tri._position0 = curr;
+				tri._normal0 = SampleNormalTrilinear(blockIdx, curr);
 
-			curr = meshVertices[_CornerToVertTable[cornerFlag * 15 + i * 3 + 2]]; //note the winding order!!!!
-			tri._position1 = curr;
-			tri._normal1 = SampleNormalTrilinear(blockIdx, curr);
+				curr = meshVertices[_CornerToVertTable[cornerFlag * 15 + i * 3 + 2]]; //note the winding order!!!!
+				tri._position1 = curr;
+				tri._normal1 = SampleNormalTrilinear(blockIdx, curr);
 
-			curr = meshVertices[_CornerToVertTable[cornerFlag * 15 + i * 3 + 1]];
-			tri._position2 = curr;
-			tri._normal2 = SampleNormalTrilinear(blockIdx, curr);
+				curr = meshVertices[_CornerToVertTable[cornerFlag * 15 + i * 3 + 1]];
+				tri._position2 = curr;
+				tri._normal2 = SampleNormalTrilinear(blockIdx, curr);
 
-			//add to the end of the list
-			uint end;
-			InterlockedAdd(_TriEndIndex[0],1,end);
-			_Meshes[end] = tri;
+				//add to the end of the list
+				uint end;
+				InterlockedAdd(_TriEndIndex[0],1,end);
+				_Meshes[end] = tri;
+			}
 		}
+
 	}
+	GroupMemoryBarrierWithGroupSync();
+
+	if(flatIdx == 0)
+		_TriBlockNum[blockIdx] = triNumPerBlock;
 }

@@ -37,7 +37,7 @@ struct Particle
 	float _inv_density;
 	float3 _position;
 	float3 _velocity;
-	bool _onSurface;
+	uint _onSurface;
 	float3 _midVelocity;
     float3 _prevVelocity;
     float _pressure;
@@ -85,6 +85,7 @@ uniform float _SurfaceThreshold;
 uniform float _Eps;
 
 //MC Engine params -- SET ME!!!!!
+uniform uint3 _MCEngineDim;
 uniform float _MCVoxelScale;
 
 //SPH Const
@@ -96,80 +97,80 @@ uniform float _MCVoxelScale;
 #define kViscosityConst (2.387324146378)
 #define lapkViscosityConst (14.3239448783)
 
-void FindNeighborSpace(uint3 idx, out bool neighbor[27])
+void FindNeighborSpace(uint3 idx, out uint neighbor[27])
 {
 	//for(uint p = 0; p < 27; ++p)
 	//	neighbor[p] = false;
 	 
 	 //x + 3y + 9z
-	 neighbor[13] = true;
+	 neighbor[13] = 1;
 
 	 if (idx.x > 0) // (0, 1, 1) -> 12
-		neighbor[12] = true;
+		neighbor[12] = 1;
 	 if (idx.y > 0) // (1, 0, 1) ->10
-		neighbor[10] = true;
+		neighbor[10] = 1;
      if (idx.z > 0) // (1, 1, 0) -> 4
-        neighbor[4] = true;
+        neighbor[4] = 1;
 
      if (idx.x < _SphGridSize.x - 1) // (2, 1, 1) -> 14
-        neighbor[14] = true;
+        neighbor[14] = 1;
      if (idx.y < _SphGridSize.y - 1) // (1, 2, 1) -> 16
-        neighbor[16] = true;
+        neighbor[16] = 1;
      if (idx.z < _SphGridSize.z - 1) // (1, 1, 2) -> 22
-        neighbor[22] = true;
+        neighbor[22] = 1;
 
      if (idx.x > 0 && idx.y > 0) // (0, 0, 1) -> 9
-        neighbor[9] = true;
+        neighbor[9] = 1;
 
      if (idx.y > 0 && idx.z > 0) // (1, 0, 0) -> 1
-        neighbor[1] = true;
+        neighbor[1] = 1;
 
      if (idx.x > 0 && idx.z > 0) // (0, 1, 0) -> 3
-        neighbor[3] = true;
+        neighbor[3] = 1;
 
      if (idx.x < _SphGridSize.x - 1 && idx.y < _SphGridSize.y - 1) // (2, 2, 1) -> 17
-        neighbor[17] = true;
+        neighbor[17] = 1;
 
      if (idx.y < _SphGridSize.y - 1 && idx.z < _SphGridSize.z - 1) // (1, 2, 2) -> 25
-        neighbor[25] = true;
+        neighbor[25] = 1;
 
 	 if (idx.x < _SphGridSize.x - 1 && idx.z < _SphGridSize.z - 1) // (2, 1, 2) -> 23
-        neighbor[23] = true;
+        neighbor[23] = 1;
 
      if (idx.x > 0 && idx.y < _SphGridSize.y - 1) // (0, 2, 1) -> 15
-        neighbor[15] = true;
+        neighbor[15] = 1;
 
      if (idx.y > 0 && idx.z < _SphGridSize.z - 1) // (1, 0, 2) -> 19
-        neighbor[19] = true;
+        neighbor[19] = 1;
 
      if (idx.x > 0 && idx.z < _SphGridSize.z - 1) // (0, 1, 2) -> 21
-        neighbor[21] = true;
+        neighbor[21] = 1;
 
      if (idx.x < _SphGridSize.x - 1 && idx.y > 0) // (2, 0, 1) -> 11
-        neighbor[11] = true;
+        neighbor[11] = 1;
      if (idx.y < _SphGridSize.y - 1 && idx.z > 0) // (1, 2, 0) -> 7
-        neighbor[7] = true;
+        neighbor[7] = 1;
      if (idx.x < _SphGridSize.x - 1 && idx.z > 0) // (2, 1, 0) -> 5
-        neighbor[5] = true;
+        neighbor[5] = 1;
      if (idx.x > 0 && idx.y > 0 && idx.z > 0) // (0, 0, 0) -> 0
-         neighbor[0] = true;
+         neighbor[0] = 1;
 
      if (idx.x < _SphGridSize.x - 1 && idx.y > 0 && idx.z > 0) // (2, 0, 0) -> 2
-        neighbor[2] = true;
+        neighbor[2] = 1;
      if (idx.x > 0 && idx.y < _SphGridSize.y - 1 && idx.z > 0) // (0, 2, 0) -> 6
-        neighbor[6] = true;
+        neighbor[6] = 1;
      if (idx.x > 0 && idx.y > 0 && idx.z < _SphGridSize.z - 1) // (0, 0, 2) -> 18
-        neighbor[18] = true;
+        neighbor[18] = 1;
 
      if (idx.x < _SphGridSize.x - 1 && idx.y < _SphGridSize.y - 1 && idx.z > 0) // (2, 2, 0) -> 8
-         neighbor[8] = true; 
+         neighbor[8] = 1; 
 	 if (idx.x > 0 && idx.y < _SphGridSize.y - 1 && idx.z < _SphGridSize.z - 1) // (0, 2, 2) -> 24
-         neighbor[24] = true;
+         neighbor[24] = 1;
 	 if (idx.x < _SphGridSize.x - 1 && idx.y > 0 && idx.z < _SphGridSize.z - 1) // (2, 0, 2) -> 20
-         neighbor[20] = true;
+         neighbor[20] = 1;
     
 	 if (idx.x < _SphGridSize.x - 1 && idx.y < _SphGridSize.y - 1 && idx.z < _SphGridSize.z - 1) // (2, 2, 2) -> 26
-         neighbor[26] = true;
+         neighbor[26] = 1;
 }
 
 inline float KernelPoly6(float3 r)

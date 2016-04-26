@@ -48,7 +48,7 @@ namespace SPHFluid
         public float inv_density;
         public Vector3 position;
         public Vector3 velocity;
-        public bool onSurface;
+        public int onSurface;
         public Vector3 midVelocity;
         public Vector3 prevVelocity;
         public float pressure;
@@ -65,7 +65,7 @@ namespace SPHFluid
             this.inv_density = inv_density;
             this.position = position;
             this.velocity = Vector3.zero;
-            this.onSurface = false;
+            this.onSurface = 0;
             this.midVelocity = Vector3.zero;
             this.prevVelocity = Vector3.zero;
             this.pressure = 0f;
@@ -82,7 +82,7 @@ namespace SPHFluid
             this.inv_density = 0f;
             this.position = position;
             this.velocity = velocity;
-            this.onSurface = false;
+            this.onSurface = 0;
             this.midVelocity = Vector3.zero;
             this.prevVelocity = Vector3.zero;
             this.pressure = 0f;
@@ -93,7 +93,7 @@ namespace SPHFluid
             this.cellIdx1d = 0;
         }
 
-        public static int stride = sizeof(float) * 27 + 4 + sizeof(int); //NOTICE that bool is 4 bytes on GPU!
+        public static int stride = sizeof(float) * 27 + sizeof(int) * 2; //NOTICE that bool is 4 bytes on GPU!
     }
 
     public class CSParticleComparer : IComparer

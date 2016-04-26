@@ -14,7 +14,7 @@ groupshared uint groupCellPrefixSum[CELL_SCAN_THREAD_NUM_3D];
 RWStructuredBuffer<uint> _ParticleCellNumPrefixSum;
 RWBuffer<uint> _ParticlePrefixLocalOffset; //[ceil(_SphGridSize_3D / CELL_SCAN_THREAD_NUM_3D)]
 RWStructuredBuffer<Particle> _Particles;
-RWStructuredBuffer<bool> _NeighborSpace;
+RWStructuredBuffer<uint> _NeighborSpace;
 
 [numthreads(SPH_THREAD_NUM,SPH_THREAD_NUM,SPH_THREAD_NUM)]
 void ComputeCellIdx (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
@@ -105,10 +105,13 @@ void FindNeighborSpace (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID
 
 	uint3 cellIdx = floor(_Particles[flatIdx]._position * _inv_KernelRadius);
 
-	bool neighbor[27];
+	uint neighbor[27];
+	uint i = 0;
+	for(i = 0; i < 27; ++i)
+		neighbor[i] = 0;
 	FindNeighborSpace(cellIdx, neighbor);
 	
-	for(int i = 0; i < 27; ++i)
+	for(i = 0; i < 27; ++i)
 		_NeighborSpace[flatIdx * 27 + i] = neighbor[i];
 }
 
@@ -140,6 +143,8 @@ void UpdatePressureDensity (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_Gro
 		}
 	}
 
+	if(_Particles[flatIdx]._inv_density < _RestDensity)
+		_Particles[flatIdx]._inv_density = _RestDensity;
 	_Particles[flatIdx]._pressure = _Stiffness * (_Particles[flatIdx]._inv_density - _RestDensity);
 	_Particles[flatIdx]._inv_density = 1 / _Particles[flatIdx]._inv_density;
 }
@@ -155,7 +160,7 @@ void UpdateParticleFluidForce (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_
 	_Particles[flatIdx]._forcePressure = float3(0, 0, 0);
 	_Particles[flatIdx]._forceViscosity = float3(0, 0, 0);
 	_Particles[flatIdx]._forceTension = float3(0, 0, 0);
-	_Particles[flatIdx]._onSurface = false;
+	_Particles[flatIdx]._onSurface = 0;
 	_Particles[flatIdx]._colorGradient = float3(0, 0, 0);
 	float tension = 0;
 
@@ -195,7 +200,7 @@ void UpdateParticleFluidForce (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_
 
 	if(dot(_Particles[flatIdx]._colorGradient, _Particles[flatIdx]._colorGradient) > _SurfaceThreshold * _SurfaceThreshold)
 	{
-		_Particles[flatIdx]._onSurface = true;
+		_Particles[flatIdx]._onSurface = 1;
 		_Particles[flatIdx]._forceTension = _TensionCoef * tension * normalize(_Particles[flatIdx]._colorGradient);
 	}
 }
