@@ -8,7 +8,7 @@ namespace SPHFluid
     public class FluidController : MonoBehaviour
     {
         public MarchingCubeEngine mcEngine;
-        private SPHSolver sphSolver;
+        public SPHSolver sphSolver;
         public ComputeShader shaderSPH;
         public ComputeShader shaderRadixSort;
         public int maxParticleNum;
@@ -28,7 +28,9 @@ namespace SPHFluid
 
         private float _timer;
 
-        public void Init()
+        
+
+        public void Init(int particleNumLevel, int meshResLevel)
         {
             //ExampleMc()
             sphSolver = new SPHSolver(maxParticleNum, timeStep, kernelRadius,
@@ -37,15 +39,19 @@ namespace SPHFluid
                                         gridSize._x, gridSize._y, gridSize._z, shaderSPH,
                                         shaderRadixSort);
 
+            SpawnParticleBlock(particleNumLevel);
             //CreateTest125CubeGPU();
             //CreateTest1000CubeGPU();
-            CreateTest8000CubeGPU();
+            //CreateTest10000CubeGPU();
             //sphSolver.Init();
             sphSolver.InitOnGPU();
 
-            mcEngine.engineScale = (float)gridSize._x / (float)mcEngine.width;
-            mcEngine.Init(sphSolver);
+            mcEngine.width = sphSolver.gridSize._x * meshResLevel;
+            mcEngine.height = sphSolver.gridSize._y * meshResLevel;
+            mcEngine.length = sphSolver.gridSize._z * meshResLevel;
 
+            mcEngine.engineScale = (float)kernelRadius / (float)meshResLevel;
+            mcEngine.Init(sphSolver);
 
             _timer = 0f;
         }
@@ -84,14 +90,37 @@ namespace SPHFluid
                     }
         }
 
-        private void CreateTest8000CubeGPU()
+        private void CreateTest10000CubeGPU()
         {
             for (int x = 0; x < 20; ++x)
-                for (int y = 0; y < 20; ++y)
+                for (int y = 0; y < 25; ++y)
                     for (int z = 0; z < 20; ++z)
                     {
-                        sphSolver.CreateGPUParticle(1, new Vector3(0.01f + 0.49f * x, 0.01f + 0.49f * y, 0.01f + 0.49f * z), Vector3.zero);
+                        sphSolver.CreateGPUParticle(1, new Vector3(0.01f + 0.49f * x, 0.01f + 0.39f * y, 0.01f + 0.49f * z), Vector3.zero);
                     }
+        }
+
+        private readonly static Int3[] exampleBlockDim = new Int3[10]
+            {
+                new Int3(10, 10, 10), new Int3(10, 20, 10),
+                new Int3(15, 20, 10), new Int3(20, 20, 10),
+                new Int3(20, 25, 10), new Int3(20, 30, 10),
+                new Int3(20, 35, 10), new Int3(20, 20, 20),
+                new Int3(20, 25, 18), new Int3(20, 25, 20),
+            };
+        private void SpawnParticleBlock(int level)
+        {
+            if (level <= 0 || level > 10)
+                return;
+            Int3 dim = exampleBlockDim[level - 1];
+            Vector3 center = 0.5f * new Vector3(sphSolver.gridSize._x, sphSolver.gridSize._y, sphSolver.gridSize._z);
+            Vector3 extent = 0.5f * new Vector3(sphSolver.gridSize._x - 2, sphSolver.gridSize._y - 2, sphSolver.gridSize._z - 2);
+            Vector3 interval = Vector3.Scale(2 * extent, new Vector3(1f / (dim._x - 1), 1f / (dim._y - 1), 1f / (dim._z - 1)));
+            for (int x = 0; x < dim._x; ++x)
+                for (int y = 0; y < dim._y; ++y)
+                    for (int z = 0; z < dim._z; ++z)
+                        sphSolver.CreateGPUParticle(1, center - extent + new Vector3(x * interval.x, y * interval.y, z * interval.z), Vector3.zero);
+
         }
         #endregion
 

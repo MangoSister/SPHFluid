@@ -94,7 +94,7 @@ namespace SPHFluid.Render
         public Vector3 engineOrigin { get { return engineTransform.position; } set { engineTransform.position = value; } }
 
         //The actual size of the engine (scaled by engineScale) .
-        public Vector3 engineSize { get { return new Vector3(width, height, length) * engineScale; } }
+        public Vector3 engineDim { get { return new Vector3(width, height, length) * engineScale; } }
 
         //The size of a voxel cell (units)
         public float engineScale = 1f;
