@@ -17,7 +17,7 @@ public class ControlPanel : MonoBehaviour
     public SliderValReader sliderTimeStep;
     public SliderValReader sliderKernelRadius;
     public SliderValReader sliderStiffness;
-    public SliderValReader sliderRestDensityl;
+    public SliderValReader sliderRestDensity;
     public SliderValReader sliderViscosity;
     public SliderValReader sliderTensionStrength;
     public SliderValReader sliderSurfaceThreshold;
@@ -58,7 +58,10 @@ public class ControlPanel : MonoBehaviour
             ctrl.timeStep = sliderTimeStep.GetVal();
             ctrl.kernelRadius = sliderKernelRadius.GetVal();
             ctrl.stiffness = sliderStiffness.GetVal();
-            ctrl.restDensity = sliderRestDensityl.GetVal();
+            ctrl.restDensity = sliderRestDensity.GetVal();
+            ctrl.tensionCoef = sliderTensionStrength.GetVal();
+            ctrl.surfaceThreshold = sliderSurfaceThreshold.GetVal();
+
             ctrl.externalAcc.x = sliderGravityX.GetVal();
             ctrl.externalAcc.y = sliderGravityY.GetVal();
             ctrl.externalAcc.z = sliderGravityZ.GetVal();
@@ -93,7 +96,7 @@ public class ControlPanel : MonoBehaviour
             ball0.transform.localScale = Vector3.one * radius;
             ball0.transform.rotation = Quaternion.identity;
             ball1.transform.position = simCenter;
-            ball1.transform.localScale = Vector3.one * radius;
+            ball1.transform.localScale = Vector3.one * radius * 2;
             ball1.transform.rotation = Quaternion.identity;
             ctrl.enabled = true;
 

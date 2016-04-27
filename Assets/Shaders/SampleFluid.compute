@@ -18,7 +18,7 @@ void CollectSurfaceBlock (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_Group
 	uint flatIdx = groupIdx + groupId.x * SPH_THREAD_NUM_3D;
 	if((flatIdx < _ParticleNum) && _Particles[flatIdx]._onSurface == 1)
 	{	
-		uint3 blockIdx = floor(_Particles[flatIdx]._position /* - McEngine.origin? */) / (_MCVoxelScale * BLOCK_SIZE);
+		uint3 blockIdx = floor(_Particles[flatIdx]._position /* - McEngine.origin? */ / (_MCVoxelScale * BLOCK_SIZE));
 		uint blockIdx1d = blockIdx.x * _MCEngineDim.y * _MCEngineDim.z + 
 							blockIdx.y * _MCEngineDim.z +
 							blockIdx.z;
@@ -58,7 +58,7 @@ void SampleFluid  (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 	_Normals[outputIdx] = float3(0, 0, 0);
 	for(i = 0; i < 27; ++i)
 	{
-		if(neighbor[i])
+		if(neighbor[i] != 0)
 		{
 			//get particles from each neighbor SPH grid cell
 			uint3 neighborIdx = cellWorldIdx + neighborOffset[i];

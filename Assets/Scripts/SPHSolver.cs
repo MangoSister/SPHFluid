@@ -148,8 +148,8 @@ namespace SPHFluid
             _neighborSpaceInit = new int[currParticleNum * 27];
             _bufferNeighborSpace.SetData(_neighborSpaceInit);
 
-            _bufferParticleNumPerCell = new ComputeBuffer(gridCountXYZ, sizeof(int));
-            _particleNumPerCellInit = new int[gridCountXYZ];
+            _bufferParticleNumPerCell = new ComputeBuffer(gridCountXYZ + 1, sizeof(int));
+            _particleNumPerCellInit = new int[gridCountXYZ + 1];
             _bufferParticleNumPerCell.SetData(_particleNumPerCellInit);
 
 
@@ -233,6 +233,12 @@ namespace SPHFluid
             
             _shaderSPH.Dispatch(_kernelAp, _sphthreadGroupNum, 1, 1);
 
+            if (_bufferObstacles != null)
+            {
+                _bufferObstacles.Release();
+                _bufferObstacles = null;
+            }
+
             _bufferParticleNumPerCell.SetData(_particleNumPerCellInit);
             _shaderSPH.SetBuffer(_kernelCci, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelCci, "_Particles", _bufferParticles);
@@ -250,13 +256,8 @@ namespace SPHFluid
             _shaderSPH.SetBuffer(_kernelScanGlobal, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.Dispatch(_kernelScanGlobal, _scanThreadGroupNum, 1, 1);
 
-            if (_bufferObstacles != null)
-            {
-                _bufferObstacles.Release();
-                _bufferObstacles = null;
-            }
 
-            _bufferParticles.GetData(_allCSParticlesContainer);
+            //_bufferParticles.GetData(_allCSParticlesContainer);
         }
 
         public void Free()

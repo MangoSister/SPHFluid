@@ -211,7 +211,7 @@ namespace SPHFluid.Render
                             if (_blocks[x, y, z] == null)
                                 continue;
                             if (_blocks[x, y, z].GetComponent<MeshFilter>().mesh != null)
-                                _blocks[x, y, z].GetComponent<MeshFilter>().mesh.Clear();
+                                _blocks[x, y, z].GetComponent<MeshFilter>().mesh.Clear(false);
                             //if (_blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh != null)
                              //   _blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh.Clear();
                             Destroy(_blocks[x, y, z]);
@@ -291,6 +291,8 @@ namespace SPHFluid.Render
                     _nextUpdateblocks.Add(new Int3(x, y, z));
                 }
             }
+
+            
 
             if (_nextUpdateblocks.Count == 0)
                 return;
@@ -419,8 +421,8 @@ namespace SPHFluid.Render
                 var x = _nextUpdateblocks[i]._x;
                 var y = _nextUpdateblocks[i]._y;
                 var z = _nextUpdateblocks[i]._z;                
-                _blocks[x, y, z].GetComponent<MeshFilter>().mesh.Clear();
-                var mesh = new Mesh();
+                _blocks[x, y, z].GetComponent<MeshFilter>().mesh.Clear(false);
+                var mesh = _blocks[x, y, z].GetComponent<MeshFilter>().mesh;
 
                 mesh.vertices = vertices[i];
                 int[] idx = new int[vertices[i].Length];
@@ -429,7 +431,7 @@ namespace SPHFluid.Render
                 mesh.normals = normals[i];
                 mesh.Optimize();
                 mesh.RecalculateBounds();
-                _blocks[x, y, z].GetComponent<MeshFilter>().mesh = mesh;
+               // _blocks[x, y, z].GetComponent<MeshFilter>().mesh = mesh;
                 _blocks[x, y, z].GetComponent<MeshRenderer>().material = material;
                 //_blocks[x, y, z].GetComponent<MeshCollider>().sharedMesh = mesh;
             }
@@ -447,6 +449,8 @@ namespace SPHFluid.Render
             bufferMeshes.Release();
             bufferTriEndIndex.Release();
             bufferTriBlockNum.Release();
+
+            GC.Collect();
         }
 #if UNITY_EDITOR
         private void OnDrawGizmos()

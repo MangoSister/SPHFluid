@@ -95,7 +95,11 @@ void ScanCellNumGlobal (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID
 	for(uint i = 0; i < groupId.x; ++i)
 		groupOffset += _ParticlePrefixLocalOffset[i];
 	uint flatIdx = groupIdx + groupId.x * CELL_SCAN_THREAD_NUM_3D;
-	_ParticleCellNumPrefixSum[flatIdx] += groupOffset;
+	uint sphGridCellNum = _SphGridSize.x * _SphGridSize.y * _SphGridSize.z;
+	if(flatIdx < sphGridCellNum)
+		_ParticleCellNumPrefixSum[flatIdx] += groupOffset;
+	else if(flatIdx == sphGridCellNum)
+		_ParticleCellNumPrefixSum[flatIdx] = _ParticleNum;
 }
 
 

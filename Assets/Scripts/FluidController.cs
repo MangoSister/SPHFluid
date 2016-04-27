@@ -59,9 +59,12 @@ namespace SPHFluid
         public void Free()
         {
             if (sphSolver != null)
+            {
                 sphSolver.Free();
+            }
             if (mcEngine != null)
                 mcEngine.Free();
+            System.GC.Collect();
         }
 
         private void OnDestroy()
@@ -119,7 +122,7 @@ namespace SPHFluid
             for (int x = 0; x < dim._x; ++x)
                 for (int y = 0; y < dim._y; ++y)
                     for (int z = 0; z < dim._z; ++z)
-                        sphSolver.CreateGPUParticle(1, center - extent + new Vector3(x * interval.x, y * interval.y, z * interval.z), Vector3.zero);
+                        sphSolver.CreateGPUParticle(1, Random.insideUnitSphere * 0.01f + center - extent + new Vector3(x * interval.x, y * interval.y, z * interval.z), Vector3.zero);
 
         }
         #endregion
@@ -144,17 +147,17 @@ namespace SPHFluid
             Gizmos.DrawWireCube(center, extent * 2);
             Gizmos.color = Color.white;
 
-            if (sphSolver != null && sphSolver._allCSParticlesContainer != null && sphSolver._allCSParticlesContainer.Length > 0)
-            {
-                for (int i = 0; i < sphSolver._allCSParticlesContainer.Length; ++i)
-                {
-                    Vector3 pos = transform.position;
-                    pos += new Vector3((float)sphSolver._allCSParticlesContainer[i].position.x,
-                        (float)sphSolver._allCSParticlesContainer[i].position.y,
-                        (float)sphSolver._allCSParticlesContainer[i].position.z);
-                    Gizmos.DrawWireSphere(pos, 0.2f);
-                }
-            }
+            //if (sphSolver != null && sphSolver._allCSParticlesContainer != null && sphSolver._allCSParticlesContainer.Length > 0)
+            //{
+            //    for (int i = 0; i < sphSolver._allCSParticlesContainer.Length; ++i)
+            //    {
+            //        Vector3 pos = transform.position;
+            //        pos += new Vector3((float)sphSolver._allCSParticlesContainer[i].position.x,
+            //            (float)sphSolver._allCSParticlesContainer[i].position.y,
+            //            (float)sphSolver._allCSParticlesContainer[i].position.z);
+            //        Gizmos.DrawWireSphere(pos, 0.2f);
+            //    }
+            //}
         }
 #endif
     }
