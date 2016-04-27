@@ -15,6 +15,7 @@ namespace SPHFluid
         private ComputeBuffer _bufferLocalBinMarkers;
 
         public const int bucketSize = 16;
+        public const int bucketBitNum = 4;
         public const int sortSectionNum = 64;
 
         private int _particleNum;
@@ -48,9 +49,9 @@ namespace SPHFluid
             _particleNum = particleNum;
             _groupNum = Mathf.CeilToInt((float)_particleNum / (float)sortSectionNum);
 
-            for (_roundNum = 1; _roundNum <= 8; ++_roundNum)
+            for (_roundNum = 1; _roundNum < 7; ++_roundNum)
             {
-                if ((bucketSize << (_roundNum - 1)) > _particleNum)
+                if ((1 << (4 * _roundNum)) > _particleNum)
                     break;
             }
 

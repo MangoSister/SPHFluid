@@ -7,76 +7,6 @@ namespace SPHFluid
 {
     public class SPHSolver
     {
-        #region Smooth Kernels
-        public static readonly double kPoly6Const = 1.566681471061;
-        public static readonly double gradKPoly6Const = -9.4000888264;
-        public static readonly double lapKPoly6Const = -9.4000888264;
-        public static readonly double kSpikyConst = 4.774648292757;
-        public static readonly double gradKSpikyConst = -14.3239448783;
-        public static readonly double kViscosityConst = 2.387324146378;
-        public static readonly double lapkViscosityConst = 14.3239448783;
-
-        public double KernelPoly6(Vector3d r)
-        {
-            double sqrDiff = (kr2 - r.sqrMagnitude);
-            if (sqrDiff < 0)
-                return 0;
-            return kPoly6Const * inv_kr9 * sqrDiff * sqrDiff * sqrDiff;
-        }
-
-        public Vector3d GradKernelPoly6(Vector3d r)
-        {
-            double sqrDiff = (kr2 - r.sqrMagnitude);
-            if (sqrDiff < 0)
-                return Vector3d.zero;
-            return gradKPoly6Const * inv_kr9 * sqrDiff * sqrDiff * r;
-        }
-
-        public double LaplacianKernelPoly6(Vector3d r)
-        {
-            double r2 = r.sqrMagnitude;
-            double sqrDiff = (kr2 - r2);
-            if (sqrDiff < 0)
-                return 0;
-            return lapKPoly6Const * inv_kr9 * sqrDiff * (3 * kr2 - 7 * r2);
-        }
-
-        public double KernelSpiky(Vector3d r)
-        {
-            double diff = kernelRadius - r.magnitude;
-            if (diff < 0)
-                return 0;
-            return kSpikyConst * inv_kr6 * diff * diff * diff;
-        }
-
-        public Vector3d GradKernelSpiky(Vector3d r)
-        {
-            double mag = r.magnitude;
-            double diff = (kernelRadius - mag);
-            if (diff < 0 || mag <= 0)
-                return Vector3d.zero;
-            r *= (1 / mag);
-            return gradKSpikyConst * inv_kr6 * diff * diff * r;
-        }
-
-        public double KernelViscosity(Vector3d r)
-        {
-            double mag = r.magnitude;
-            if (kernelRadius - mag < 0)
-                return 0;
-            double sqrMag = mag * mag;
-            return kViscosityConst * inv_kr3 * (-0.5 * mag * sqrMag * inv_kr3 + sqrMag / (kr2) + 0.5 * kernelRadius / mag - 1);
-        }
-
-        public double LaplacianKernelViscosity(Vector3d r)
-        {
-            double diff = kernelRadius - r.magnitude;
-            if (diff < 0)
-                return 0;
-            return lapkViscosityConst * inv_kr6 * diff;
-        }
-        #endregion
-
         public int maxParticleNum;
         public int currParticleNum { get { return allCSParticles.Count; } }
 
@@ -94,7 +24,6 @@ namespace SPHFluid
 
         public Int3 gridSize;
         public int gridCountXYZ, gridCountXY, gridCountXZ, gridCountYZ;
-        public SPHGridCell[] grid;
 
         #region GPU Adaptation
         public List<CSParticle> allCSParticles;
@@ -117,15 +46,17 @@ namespace SPHFluid
         public ComputeBuffer _bufferParticleNumPerCell;
         private ComputeBuffer _bufferParticlePrefixLocalOffset;
 
-        private bool[] _neighborSpaceInit;
+        private int[] _neighborSpaceInit;
         private int[] _particleNumPerCellInit;
-        private int[] _surfaceBlocksInit;
 
         public const int scanCellNumThreadGroupSize = 512;
         private int _scanThreadGroupNum;
 
         private ComputeShader _shaderRadixSort;
         private GPURadixSortParticles _GPUSorter;
+
+        public List<CSSphere> _obstacles;
+        private ComputeBuffer _bufferObstacles;
 
         #endregion 
 
@@ -138,7 +69,7 @@ namespace SPHFluid
             this.maxParticleNum = maxParticleNum;
 
             allCSParticles = new List<CSParticle>();
-            allCSParticles.Capacity = maxParticleNum;
+            //allCSParticles.Capacity = maxParticleNum;
 
             this.timeStep = timeStep;
             this.kernelRadius = kernelRadius;
@@ -160,14 +91,6 @@ namespace SPHFluid
             gridCountXY = gridSizeX * gridSizeY;
             gridCountXZ = gridSizeX * gridSizeZ;
             gridCountYZ = gridSizeY * gridSizeZ;
-            grid = new SPHGridCell[gridCountXYZ];
-            for (int x = 0; x < gridSize._x; ++x)
-                for (int y = 0; y < gridSize._y; ++y)
-                    for (int z = 0; z < gridSize._z; ++z)
-                    {
-                        grid[x * gridCountYZ + y * gridSize._z + z] = new SPHGridCell(x, y, z);
-                        //grid[x * gridCountYZ + y * gridSize._z + z].particles.Capacity = maxParticleNum; //maybe not a good idea
-                    }
             
             _shaderSPH = shaderSPH;
 
@@ -222,7 +145,7 @@ namespace SPHFluid
             _bufferParticles.SetData(_allCSParticlesContainer);
 
             _bufferNeighborSpace = new ComputeBuffer(currParticleNum * 27, 4);
-            _neighborSpaceInit = new bool[currParticleNum * 27];
+            _neighborSpaceInit = new int[currParticleNum * 27];
             _bufferNeighborSpace.SetData(_neighborSpaceInit);
 
             _bufferParticleNumPerCell = new ComputeBuffer(gridCountXYZ, sizeof(int));
@@ -248,16 +171,6 @@ namespace SPHFluid
             _shaderSPH.SetBuffer(_kernelScanGlobal, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.Dispatch(_kernelScanGlobal, _scanThreadGroupNum, 1, 1);
 
-            //_bufferParticleNumPerCell.GetData(_particleStartIndexPerCell);
-            //int startIdx = 0;
-            //for (int i = 0; i < gridCountXYZ + 1; ++i)
-            //{
-            //    int oldVal = _particleStartIndexPerCell[i];
-            //    _particleStartIndexPerCell[i] = startIdx;
-            //    startIdx += oldVal;
-            //}
-            //_bufferParticleStartIndexPerCell.SetData(_particleStartIndexPerCell);
-
             _shaderSPH.SetBuffer(_kernelFns, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.SetBuffer(_kernelFns, "_Particles", _bufferParticles);
             _shaderSPH.SetBuffer(_kernelFns, "_NeighborSpace", _bufferNeighborSpace);
@@ -282,7 +195,7 @@ namespace SPHFluid
 
             _shaderSPH.Dispatch(_kernelIp, _sphthreadGroupNum, 1, 1);
 
-            _bufferParticles.GetData(_allCSParticlesContainer);
+            //_bufferParticles.GetData(_allCSParticlesContainer);
         }
 
         public void StepOnGPU()
@@ -311,6 +224,13 @@ namespace SPHFluid
             _shaderSPH.SetBuffer(_kernelAp, "_Particles", _bufferParticles);
             _shaderSPH.SetBuffer(_kernelAp, "_NeighborSpace", _bufferNeighborSpace);
 
+            if (_obstacles != null && _obstacles.Count > 0)
+            {
+                _bufferObstacles = new ComputeBuffer(_obstacles.Count, CSSphere.stride);
+                _bufferObstacles.SetData(_obstacles.ToArray());
+                _shaderSPH.SetBuffer(_kernelAp, "_Obstacles", _bufferObstacles);
+            }
+            
             _shaderSPH.Dispatch(_kernelAp, _sphthreadGroupNum, 1, 1);
 
             _bufferParticleNumPerCell.SetData(_particleNumPerCellInit);
@@ -329,6 +249,12 @@ namespace SPHFluid
             _shaderSPH.SetBuffer(_kernelScanGlobal, "_ParticlePrefixLocalOffset", _bufferParticlePrefixLocalOffset);
             _shaderSPH.SetBuffer(_kernelScanGlobal, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.Dispatch(_kernelScanGlobal, _scanThreadGroupNum, 1, 1);
+
+            if (_bufferObstacles != null)
+            {
+                _bufferObstacles.Release();
+                _bufferObstacles = null;
+            }
 
             _bufferParticles.GetData(_allCSParticlesContainer);
         }
@@ -357,6 +283,12 @@ namespace SPHFluid
             {
                 _bufferParticlePrefixLocalOffset.Release();
                 _bufferParticlePrefixLocalOffset = null;
+            }
+
+            if (_bufferObstacles != null)
+            {
+                _bufferObstacles.Release();
+                _bufferObstacles = null;
             }
 
             _GPUSorter.Free();
