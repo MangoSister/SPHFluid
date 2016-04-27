@@ -113,8 +113,8 @@ namespace SPHFluid
             if (level <= 0 || level > 10)
                 return;
             Int3 dim = exampleBlockDim[level - 1];
-            Vector3 center = 0.5f * new Vector3(sphSolver.gridSize._x, sphSolver.gridSize._y, sphSolver.gridSize._z);
-            Vector3 extent = 0.5f * new Vector3(sphSolver.gridSize._x - 2, sphSolver.gridSize._y - 2, sphSolver.gridSize._z - 2);
+            Vector3 center = 0.5f * (float)kernelRadius * new Vector3(sphSolver.gridSize._x, sphSolver.gridSize._y, sphSolver.gridSize._z);
+            Vector3 extent = 0.5f * (float)kernelRadius * new Vector3(sphSolver.gridSize._x - 2, sphSolver.gridSize._y - 2, sphSolver.gridSize._z - 2);
             Vector3 interval = Vector3.Scale(2 * extent, new Vector3(1f / (dim._x - 1), 1f / (dim._y - 1), 1f / (dim._z - 1)));
             for (int x = 0; x < dim._x; ++x)
                 for (int y = 0; y < dim._y; ++y)
@@ -144,17 +144,17 @@ namespace SPHFluid
             Gizmos.DrawWireCube(center, extent * 2);
             Gizmos.color = Color.white;
 
-            //if (sphSolver != null && sphSolver._allCSParticlesContainer != null && sphSolver._allCSParticlesContainer.Length > 0)
-            //{
-            //    for (int i = 0; i < sphSolver._allCSParticlesContainer.Length; ++i)
-            //    {
-            //        Vector3 pos = transform.position;
-            //        pos += new Vector3((float)sphSolver._allCSParticlesContainer[i].position.x,
-            //            (float)sphSolver._allCSParticlesContainer[i].position.y,
-            //            (float)sphSolver._allCSParticlesContainer[i].position.z);
-            //        Gizmos.DrawWireSphere(pos, 0.2f);
-            //    }
-            //}
+            if (sphSolver != null && sphSolver._allCSParticlesContainer != null && sphSolver._allCSParticlesContainer.Length > 0)
+            {
+                for (int i = 0; i < sphSolver._allCSParticlesContainer.Length; ++i)
+                {
+                    Vector3 pos = transform.position;
+                    pos += new Vector3((float)sphSolver._allCSParticlesContainer[i].position.x,
+                        (float)sphSolver._allCSParticlesContainer[i].position.y,
+                        (float)sphSolver._allCSParticlesContainer[i].position.z);
+                    Gizmos.DrawWireSphere(pos, 0.2f);
+                }
+            }
         }
 #endif
     }

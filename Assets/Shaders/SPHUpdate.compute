@@ -9,6 +9,9 @@
 #pragma kernel AdvanceParticle
 #pragma kernel InitParticle
 
+//Input
+StructuredBuffer<Sphere> _Obstacles;
+
 //Updating
 groupshared uint groupCellPrefixSum[CELL_SCAN_THREAD_NUM_3D];
 RWStructuredBuffer<uint> _ParticleCellNumPrefixSum;
@@ -216,12 +219,44 @@ void AdvanceParticle (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 			_Particles[flatIdx]._forceViscosity + 
 			_Particles[flatIdx]._forceTension) /
 			_Particles[flatIdx]._mass + _ExternalAcc;
+	
 
 	_Particles[flatIdx]._position += _Particles[flatIdx]._velocity * _TimeStep;
 	_Particles[flatIdx]._prevVelocity = _Particles[flatIdx]._velocity;
 	_Particles[flatIdx]._velocity += acc * _TimeStep;
 	_Particles[flatIdx]._midVelocity = 0.5 * (_Particles[flatIdx]._velocity + _Particles[flatIdx]._prevVelocity);
 	
+	//obstacles collision
+	uint numObstacles = 0;
+	uint stride;
+	_Obstacles.GetDimensions(numObstacles, stride);
+	for(uint i = 0; i < numObstacles; ++i)
+	{
+		if( _Obstacles[i]._active == 0)
+			continue;
+
+		float3 diff = _Particles[flatIdx]._position - _Obstacles[i]._center;
+		float sqDist = dot(diff, diff);
+		if(sqDist <= 0)
+		{
+			_Particles[flatIdx]._position = 
+			float3(_Obstacles[i]._radius, 0, 0) + _Eps + _Obstacles[i]._center;
+		}
+		else if(sqDist < _Obstacles[i]._radius * _Obstacles[i]._radius)
+		{
+			float3 normal = diff / sqrt(sqDist);
+
+			_Particles[flatIdx]._position = 
+			normal * (_Obstacles[i]._radius + _Eps) + _Obstacles[i]._center;
+
+			float3 veloNormal = dot(_Particles[flatIdx]._velocity, normal) * normal;
+			_Particles[flatIdx]._velocity -= veloNormal;
+			_Particles[flatIdx]._velocity += - veloNormal + 2 * dot(_Obstacles[i]._velocity, normal) * normal;
+			
+			_Particles[flatIdx]._midVelocity = 0.5 * (_Particles[flatIdx]._velocity + _Particles[flatIdx]._prevVelocity);
+		}
+	}
+	//boundary collision
 	ApplyGridBoundaryCondition(_Particles[flatIdx]);
 
 }

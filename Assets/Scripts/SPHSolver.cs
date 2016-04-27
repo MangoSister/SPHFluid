@@ -55,6 +55,9 @@ namespace SPHFluid
         private ComputeShader _shaderRadixSort;
         private GPURadixSortParticles _GPUSorter;
 
+        public List<CSSphere> _obstacles;
+        private ComputeBuffer _bufferObstacles;
+
         #endregion 
 
         public SPHSolver(int maxParticleNum, double timeStep, double kernelRadius,
@@ -221,6 +224,13 @@ namespace SPHFluid
             _shaderSPH.SetBuffer(_kernelAp, "_Particles", _bufferParticles);
             _shaderSPH.SetBuffer(_kernelAp, "_NeighborSpace", _bufferNeighborSpace);
 
+            if (_obstacles != null && _obstacles.Count > 0)
+            {
+                _bufferObstacles = new ComputeBuffer(_obstacles.Count, CSSphere.stride);
+                _bufferObstacles.SetData(_obstacles.ToArray());
+                _shaderSPH.SetBuffer(_kernelAp, "_Obstacles", _bufferObstacles);
+            }
+            
             _shaderSPH.Dispatch(_kernelAp, _sphthreadGroupNum, 1, 1);
 
             _bufferParticleNumPerCell.SetData(_particleNumPerCellInit);
@@ -240,7 +250,13 @@ namespace SPHFluid
             _shaderSPH.SetBuffer(_kernelScanGlobal, "_ParticleCellNumPrefixSum", _bufferParticleNumPerCell);
             _shaderSPH.Dispatch(_kernelScanGlobal, _scanThreadGroupNum, 1, 1);
 
-            //_bufferParticles.GetData(_allCSParticlesContainer);
+            if (_bufferObstacles != null)
+            {
+                _bufferObstacles.Release();
+                _bufferObstacles = null;
+            }
+
+            _bufferParticles.GetData(_allCSParticlesContainer);
         }
 
         public void Free()
@@ -267,6 +283,12 @@ namespace SPHFluid
             {
                 _bufferParticlePrefixLocalOffset.Release();
                 _bufferParticlePrefixLocalOffset = null;
+            }
+
+            if (_bufferObstacles != null)
+            {
+                _bufferObstacles.Release();
+                _bufferObstacles = null;
             }
 
             _GPUSorter.Free();
