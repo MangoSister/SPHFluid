@@ -257,7 +257,7 @@ namespace SPHFluid
             _shaderSPH.Dispatch(_kernelScanGlobal, _scanThreadGroupNum, 1, 1);
 
 
-            //_bufferParticles.GetData(_allCSParticlesContainer);
+            _bufferParticles.GetData(_allCSParticlesContainer);
         }
 
         public void Free()

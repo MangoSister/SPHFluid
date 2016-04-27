@@ -48,6 +48,7 @@ void ScanCellNumLocal (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 	
 	//parallel scan: up-sweep
 	int d = 0;
+	[unroll]
 	for(d = 0; d < LOG2_CELL_SCAN_THREAD_NUM_3D; ++d)
 	{
 		uint pow_2_d_1 = 1 << (d + 1);
@@ -68,6 +69,7 @@ void ScanCellNumLocal (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 	GroupMemoryBarrierWithGroupSync();
 
 	//parallel scan: down-sweep
+	[unroll]
 	for(d = LOG2_CELL_SCAN_THREAD_NUM_3D - 1; d >= 0; --d)
 	{
 		uint pow_2_d_1 = 1 << (d + 1);
@@ -114,10 +116,13 @@ void FindNeighborSpace (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID
 
 	uint neighbor[27];
 	uint i = 0;
+
+	[unroll]
 	for(i = 0; i < 27; ++i)
 		neighbor[i] = 0;
 	FindNeighborSpace(cellIdx, neighbor);
-	
+
+	[unroll]
 	for(i = 0; i < 27; ++i)
 		_NeighborSpace[flatIdx * 27 + i] = neighbor[i];
 }
@@ -131,6 +136,7 @@ void UpdatePressureDensity (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_Gro
 
 	_Particles[flatIdx]._inv_density = 0;
 
+	[unroll]
 	for(uint i = 0; i < 27; ++i)
 	{
 		if(!_NeighborSpace[flatIdx * 27 + i])
@@ -171,6 +177,7 @@ void UpdateParticleFluidForce (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_
 	_Particles[flatIdx]._colorGradient = float3(0, 0, 0);
 	float tension = 0;
 
+	[unroll]
 	for(uint i = 0; i < 27; ++i)
 	{
 		if(!_NeighborSpace[flatIdx * 27 + i])

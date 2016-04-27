@@ -33,6 +33,7 @@ void CollectTriNum (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 	FillCube(blockIdx, cellIdx, cube);
 
 	int cornerFlag = 0;
+	[unroll]
 	for(int i = 0; i < 8; i++)
 		if(cube[i] > 0)
 			cornerFlag = cornerFlag | (1 << i);

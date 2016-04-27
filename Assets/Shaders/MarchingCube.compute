@@ -100,6 +100,8 @@ void MarchingCube (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 
 		float3 meshVertices[12];
 		float3 cellMin = float3(cellIdx.x, cellIdx.y, cellIdx.z);
+
+		[unroll]
 		for(int e = 0; e < 12; e++)
 		{
 			//if there is an intersection on this edge
@@ -115,7 +117,7 @@ void MarchingCube (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 			}
 		}
 
-
+		[unroll]
 		for(int i = 0; i < 5; i++)
 		{
 			if(_CornerToVertTable[cornerFlag * 15 + i * 3] >= 0)

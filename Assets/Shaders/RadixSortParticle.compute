@@ -55,6 +55,7 @@ void LocalCount (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 	if(groupId.x == 0)
 		_GroupContainer[groupIdx] = 0;
 	
+	[unroll]
 	for(int i = 0; i < BUCKET_SIZE; ++i)
 		_LocalBinMarkers[groupIdx + i * SORT_SECTION_SIZE_2D + 
 						  groupId.x * BUCKET_SIZE * SORT_SECTION_SIZE_2D] = 0;
@@ -76,6 +77,7 @@ void LocalCount (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 	{
 		//compute local prefix sum
 		uint counter = 0;
+		[unroll]
 		for(int i = 0; i < BUCKET_SIZE; ++i)
 		{
 			uint oldVal = _GroupBucket[i];
@@ -103,6 +105,7 @@ void PrecedeScan (uint3 threadId : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 
 	//parallel scan: up-sweep
 	int d = 0;
+	[unroll]
 	for(d = 0; d < LOG2_SORT_SECTION_SIZE_2D - 1; ++d)
 	{
 		uint pow_2_d_1 = 1 << (d + 1);
@@ -122,6 +125,7 @@ void PrecedeScan (uint3 threadId : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 	GroupMemoryBarrierWithGroupSync();
 
 	//parallel scan: down-sweep
+	[unroll]
 	for(d = LOG2_SORT_SECTION_SIZE_2D - 1; d >= 0; --d)
 	{
 		uint pow_2_d_1 = 1 << (d + 1);

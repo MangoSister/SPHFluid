@@ -16,14 +16,22 @@ RWStructuredBuffer<float3> _Normals;
 void CollectSurfaceBlock (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_GroupID)
 {
 	uint flatIdx = groupIdx + groupId.x * SPH_THREAD_NUM_3D;
-	if((flatIdx < _ParticleNum) && _Particles[flatIdx]._onSurface == 1)
+	//dirty fix here...
+	if((flatIdx < _ParticleNum)/* && _Particles[flatIdx]._onSurface == 1*/)
 	{	
-		uint3 blockIdx = floor(_Particles[flatIdx]._position /* - McEngine.origin? */ / (_MCVoxelScale * BLOCK_SIZE));
-		uint blockIdx1d = blockIdx.x * _MCEngineDim.y * _MCEngineDim.z + 
-							blockIdx.y * _MCEngineDim.z +
-							blockIdx.z;
-	
-		InterlockedOr(_SurfaceMCBlocks[blockIdx1d], 1);
+		uint3 low = floor((_Particles[flatIdx]._position - float3(_KernelRadius, _KernelRadius, _KernelRadius)) /
+					(_MCVoxelScale * BLOCK_SIZE));
+		uint3 up = floor((_Particles[flatIdx]._position + float3(_KernelRadius, _KernelRadius, _KernelRadius)) / 
+					(_MCVoxelScale * BLOCK_SIZE));
+		uint x, y, z;
+		for(x = low.x; x <= up.x; ++x)
+			for(y = low.y; y <= up.y; ++y)
+				for(z = low.z; z <= up.z; ++z)
+					{
+						uint blockIdx1d = x * _MCEngineDim.y * _MCEngineDim.z + 
+											y * _MCEngineDim.z + z;
+						InterlockedOr(_SurfaceMCBlocks[blockIdx1d], 1);
+					}	
 	}
 }
 
@@ -44,8 +52,8 @@ void SampleFluid  (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 	 (float)(_Blocks[blockIdx].y * BLOCK_SIZE + cellIdx.y),
 	 (float)(_Blocks[blockIdx].z * BLOCK_SIZE + cellIdx.z));
 
-	worldPos *= _inv_KernelRadius * _MCVoxelScale;
-	uint3 cellWorldIdx = floor(worldPos);
+	worldPos *= _MCVoxelScale;
+	uint3 cellWorldIdx = floor(worldPos * _inv_KernelRadius);
 	
 	//find neighbor space
 	uint neighbor[27];
@@ -56,6 +64,8 @@ void SampleFluid  (uint3 cellIdx : SV_GroupThreadID, uint3 groupId :SV_GroupID)
 
 	_Samples[outputIdx] = 0;
 	_Normals[outputIdx] = float3(0, 0, 0);
+
+	[unroll]
 	for(i = 0; i < 27; ++i)
 	{
 		if(neighbor[i] != 0)
