@@ -156,10 +156,17 @@ void UpdatePressureDensity (uint groupIdx : SV_GroupIndex, uint3 groupId :SV_Gro
 		}
 	}
 
-	if(_Particles[flatIdx]._inv_density < _RestDensity)
-		_Particles[flatIdx]._inv_density = _RestDensity;
-	_Particles[flatIdx]._pressure = _Stiffness * (_Particles[flatIdx]._inv_density - _RestDensity);
-	_Particles[flatIdx]._inv_density = 1 / _Particles[flatIdx]._inv_density;
+	if(_Particles[flatIdx]._inv_density <= _RestDensity)
+	{
+		_Particles[flatIdx]._pressure = 0;
+		_Particles[flatIdx]._inv_density = 1 / _RestDensity;
+	}
+	else
+	{
+		_Particles[flatIdx]._pressure = _Stiffness * (_Particles[flatIdx]._inv_density - _RestDensity);
+		_Particles[flatIdx]._inv_density = 1 / _Particles[flatIdx]._inv_density;
+	}
+
 }
 
 

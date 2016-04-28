@@ -147,17 +147,17 @@ namespace SPHFluid
             Gizmos.DrawWireCube(center, extent * 2);
             Gizmos.color = Color.white;
 
-            if (sphSolver != null && sphSolver._allCSParticlesContainer != null && sphSolver._allCSParticlesContainer.Length > 0)
-            {
-                for (int i = 0; i < sphSolver._allCSParticlesContainer.Length; ++i)
-                {
-                    Vector3 pos = transform.position;
-                    pos += new Vector3((float)sphSolver._allCSParticlesContainer[i].position.x,
-                        (float)sphSolver._allCSParticlesContainer[i].position.y,
-                        (float)sphSolver._allCSParticlesContainer[i].position.z);
-                    Gizmos.DrawWireSphere(pos, 0.2f);
-                }
-            }
+            //if (sphSolver != null && sphSolver._allCSParticlesContainer != null && sphSolver._allCSParticlesContainer.Length > 0)
+            //{
+            //    for (int i = 0; i < sphSolver._allCSParticlesContainer.Length; ++i)
+            //    {
+            //        Vector3 pos = transform.position;
+            //        pos += new Vector3((float)sphSolver._allCSParticlesContainer[i].position.x,
+            //            (float)sphSolver._allCSParticlesContainer[i].position.y,
+            //            (float)sphSolver._allCSParticlesContainer[i].position.z);
+            //        Gizmos.DrawWireSphere(pos, 0.2f);
+            //    }
+            //}
         }
 #endif
     }

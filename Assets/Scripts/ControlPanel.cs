@@ -40,6 +40,9 @@ public class ControlPanel : MonoBehaviour
     public GameObject funOption;
     public GameObject ball0, ball1;
 
+    public Button btnRun;
+    public Text notSupport;
+
     private bool isRunning = false;
 
     public void OnToggleConfiguration(bool value)
@@ -80,11 +83,11 @@ public class ControlPanel : MonoBehaviour
                 ui.interactable = false;
 
             Vector3 simCenter = 0.5f * (float)ctrl.sphSolver.kernelRadius * new Vector3(ctrl.sphSolver.gridSize._x, ctrl.sphSolver.gridSize._y, ctrl.sphSolver.gridSize._z);
-
+            Vector3 simRange = new Vector3(ctrl.sphSolver.gridSize._x, ctrl.sphSolver.gridSize._y, ctrl.sphSolver.gridSize._z) * (float)ctrl.sphSolver.kernelRadius;
             simBorder.SetActive(true);
             simBorder.transform.localPosition = simCenter;
-            simBorder.transform.localScale = new Vector3(ctrl.sphSolver.gridSize._x, ctrl.sphSolver.gridSize._y, ctrl.sphSolver.gridSize._z) * (float)ctrl.sphSolver.kernelRadius;
-
+            simBorder.transform.localScale = simRange;
+            Camera.main.transform.position = simCenter - new Vector3(0, 0, simRange.z * 2);
             toggle.isOn = false;
 
             float radius = 1f;
@@ -230,21 +233,97 @@ public class ControlPanel : MonoBehaviour
 
     }
 
-    //private void OnRenderObject()
-    //{
-    //    if (isRunning)
-    //    {
-    //        matBorderLine.SetPass(0);
-    //        GL.PushMatrix();
-    //        GL.LoadProjectionMatrix(Camera.main.projectionMatrix);
-    //        GL.modelview = Camera.main.worldToCameraMatrix;
+    private void Update()
+    {
+        if (!isRunning)
+            return;
 
-    //        GL.Begin(GL.LINES);
-    //        GL.Color(Color.red);
-    //        GL.Vertex(Vector3.zero);
-    //        GL.Vertex(new Vector3((float)ctrl.sphSolver.kernelRadius * ctrl.gridSize._x, 0f, 0f));
-    //        GL.End();
-    //        GL.PopMatrix();
-    //    }
-    //}
+        Vector3 simCenter = 0.5f * (float)ctrl.sphSolver.kernelRadius * new Vector3(ctrl.sphSolver.gridSize._x, ctrl.sphSolver.gridSize._y, ctrl.sphSolver.gridSize._z);
+        Vector3 simRange = new Vector3(ctrl.sphSolver.gridSize._x, ctrl.sphSolver.gridSize._y, ctrl.sphSolver.gridSize._z) * (float)ctrl.sphSolver.kernelRadius;
+        var pos = Camera.main.transform.position;
+        if (Input.GetKey(KeyCode.UpArrow))
+            pos.z += 0.1f;
+        if (Input.GetKey(KeyCode.DownArrow))
+            pos.z -= 0.1f;
+        if (Input.GetKey(KeyCode.LeftArrow))
+            pos.x += 0.1f;
+        if (Input.GetKey(KeyCode.RightArrow))
+            pos.x -= 0.1f;
+        Camera.main.transform.position = pos;
+
+        if (Input.GetMouseButton(1))
+        {
+            Camera.main.transform.LookAt(simCenter);
+            Camera.main.transform.RotateAround(simCenter, Vector3.up, Input.GetAxis("Mouse X") * 1);
+            Camera.main.transform.RotateAround(simCenter, Vector3.left, Input.GetAxis("Mouse Y") * 1);
+        }
+    }
+
+    private void OnRenderObject()
+    {
+        if (isRunning)
+        {
+            Vector3 upper = new Vector3(ctrl.gridSize._x, ctrl.gridSize._y, ctrl.gridSize._z) * (float)ctrl.sphSolver.kernelRadius;
+            matBorderLine.SetPass(0);
+            GL.PushMatrix();
+            //GL.LoadIdentity();
+            GL.LoadProjectionMatrix(Camera.main.projectionMatrix);
+            GL.modelview = Camera.main.worldToCameraMatrix;
+
+            GL.Begin(GL.LINES);
+            GL.Color(Color.white);
+
+            GL.Vertex(Vector3.zero);
+            GL.Vertex(new Vector3(upper.x, 0f, 0f));
+
+            GL.Vertex(new Vector3(upper.x, 0f, 0f));
+            GL.Vertex(new Vector3(upper.x, 0f, upper.z));
+
+            GL.Vertex(new Vector3(upper.x, 0f, upper.z));
+            GL.Vertex(new Vector3(0, 0f, upper.z));
+
+            GL.Vertex(new Vector3(0, 0f, upper.z));
+            GL.Vertex(Vector3.zero);
+
+
+            GL.Vertex(new Vector3(0, upper.y, 0f));
+            GL.Vertex(new Vector3(upper.x, upper.y, 0f));
+
+            GL.Vertex(new Vector3(upper.x, upper.y, 0f));
+            GL.Vertex(new Vector3(upper.x, upper.y, upper.z));
+
+            GL.Vertex(new Vector3(upper.x, upper.y, upper.z));
+            GL.Vertex(new Vector3(0, upper.y, upper.z));
+
+            GL.Vertex(new Vector3(0, upper.y, upper.z));
+            GL.Vertex(new Vector3(0, upper.y, 0f));
+
+
+            GL.Vertex(Vector3.zero);
+            GL.Vertex(new Vector3(0, upper.y, 0f));
+
+            GL.Vertex(new Vector3(upper.x, 0f, 0f));
+            GL.Vertex(new Vector3(upper.x, upper.y, 0f));
+
+            GL.Vertex(new Vector3(upper.x, 0f, upper.z));
+            GL.Vertex(new Vector3(upper.x, upper.y, upper.z));
+
+            GL.Vertex(new Vector3(0, 0f, upper.z));
+            GL.Vertex(new Vector3(0, upper.y, upper.z));
+
+            GL.End();
+            GL.PopMatrix();
+        }
+    }
+
+    private void Start()
+    {
+        if (SystemInfo.supportsComputeShaders && SystemInfo.graphicsShaderLevel < 50)
+        {
+            notSupport.gameObject.SetActive(true);
+            configuration.SetActive(false);
+            btnRun.gameObject.SetActive(false);
+            toggle.gameObject.SetActive(false);
+        }
+    }
 }
