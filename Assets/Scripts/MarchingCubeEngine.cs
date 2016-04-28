@@ -554,9 +554,6 @@ namespace SPHFluid.Render
 
         //cornerToVertTable[256][15]
         //The original lookup table. 
-        //Map every case to a sequence of edges that includes boundary points. 
-        //This table is modified from the table given on http://scrawkblog.com/2014/10/16/marching-cubes-on-the-gpu-in-unity/
-        //The original table is 256x16, which includes redundant data.
         static int[,] cornerToVertTable = new int[,] 
         {
             {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1},
