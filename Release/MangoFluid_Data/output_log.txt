@@ -1,0 +1,27 @@
+Initialize engine version: 5.4.0b15 (f24f29c81497)
+GfxDevice: creating device client; threaded=1
+Direct3D:
+    Version:  Direct3D 11.0 [level 11.0]
+    Renderer: NVIDIA GeForce GTX 745 (ID=0x1382)
+    Vendor:   NVIDIA
+    VRAM:     4035 MB
+Begin MonoManager ReloadAssembly
+Platform assembly: C:\Users\yzhou4\Desktop\MangoFluid_Data\Managed\UnityEngine.dll (this message is harmless)
+Loading C:\Users\yzhou4\Desktop\MangoFluid_Data\Managed\UnityEngine.dll into Unity Child Domain
+Platform assembly: C:\Users\yzhou4\Desktop\MangoFluid_Data\Managed\Assembly-CSharp.dll (this message is harmless)
+Loading C:\Users\yzhou4\Desktop\MangoFluid_Data\Managed\Assembly-CSharp.dll into Unity Child Domain
+Platform assembly: C:\Users\yzhou4\Desktop\MangoFluid_Data\Managed\UnityEngine.UI.dll (this message is harmless)
+Loading C:\Users\yzhou4\Desktop\MangoFluid_Data\Managed\UnityEngine.UI.dll into Unity Child Domain
+Platform assembly: C:\Users\yzhou4\Desktop\MangoFluid_Data\Managed\UnityEngine.Networking.dll (this message is harmless)
+Loading C:\Users\yzhou4\Desktop\MangoFluid_Data\Managed\UnityEngine.Networking.dll into Unity Child Domain
+- Completed reload, in  0.032 seconds
+Platform assembly: C:\Users\yzhou4\Desktop\MangoFluid_Data\Managed\System.Core.dll (this message is harmless)
+Platform assembly: C:\Users\yzhou4\Desktop\MangoFluid_Data\Managed\System.dll (this message is harmless)
+desktop: 2560x1440 59Hz; virtual: 4240x1440 at -1680,0
+<RI> Initializing input.
+<RI> Input initialized.
+<RI> Initialized touch support.
+UnloadTime: 0.762632 ms
+Setting up 2 worker threads for Enlighten.
+  Thread -> id: 19ac -> priority: 1 
+  Thread -> id: 29d4 -> priority: 1 
