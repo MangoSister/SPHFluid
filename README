@@ -7,6 +7,8 @@ This is a real-time fluid simulation application using smooth particle
 hydrodynamic method[1]. The application is made in Unity. Just play it to have
 some fun!! Youtube Video: https://youtu.be/gWqLvkn-wLY
 
+The executable is in Release/ folder
+
 1. Contribution
 -1.1 We implemented a GPGPU version of SPH simulation in HLSL / Direct Compute.
 Since the nature of SPH is parallel. This is much faster than the original CPU
