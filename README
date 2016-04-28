@@ -9,8 +9,8 @@ some fun!!
 
 1. Contribution
 -1.1 We implemented a GPGPU version of SPH simulation in HLSL / Direct Compute.
-Since the nature of SPH is parallel, this is much faster than the original CPU
-version.
+Since the nature of SPH is parallel. This is much faster than the original CPU
+version, it enables us to simulate a huge number of particles in realtime.
 
 -1.2 We implemented a GPGPU version of Marching Cube algorithm to visualize the
 fluid simulated based on the first chapter of GPU Gem 3 [2]. Again, this is much
