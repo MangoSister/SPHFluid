@@ -5,7 +5,7 @@ Yang Zhou (yzhou4) / Emily Zhou (zhangyaz)
 0. Overview
 This is a real-time fluid simulation application using smooth particle
 hydrodynamic method[1]. The application is made in Unity. Just play it to have
-some fun!!
+some fun!! Youtube Video: https://youtu.be/gWqLvkn-wLY
 
 1. Contribution
 -1.1 We implemented a GPGPU version of SPH simulation in HLSL / Direct Compute.
