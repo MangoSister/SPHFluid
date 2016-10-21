@@ -1,6 +1,6 @@
-15662 Computer Graphics - Assignment 4 SPH Fluid Simulator
+SPH Fluid Simulator on GPU
 Apr. 47th
-Yang Zhou (yzhou4) / Emily Zhou (zhangyaz)
+Yang Zhou (yzhou4)
 
 0. Overview
 This is a real-time fluid simulation application using smooth particle
