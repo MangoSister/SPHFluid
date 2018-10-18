@@ -20,11 +20,6 @@ faster than the original CPU version. The precomputed table is available from [2
 -1.3 We wrote a simple water shader (transparent, reflective (cube map)) to
 render the fluid. This is done in Unity's ShaderLab/Cg shader language.
 
-We DID NOT implement rasterization, texture importing, or model importing,
-as Unity did these for us. The skybox is a free asset from Unity's asset store.
-(but we made the app icon......)
-
-
 2. System / Compatibility
 This application can only run on Windows (7 or higher). Also, the system must
 support shader model 5.0 or higher to run it (because we are doing lots of stuffs
