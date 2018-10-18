@@ -1,6 +1,5 @@
 SPH Fluid Simulator on GPU
-Apr. 47th
-Yang Zhou (yzhou4)
+Yang Zhou
 
 0. Overview
 This is a real-time fluid simulation application using smooth particle
@@ -46,14 +45,6 @@ Arrow Key: Camera moving
 Right mouse button: rotate Camera view direction
 Ball interaction: Add some fun by moving a ball and let it collide with fluid!
 (see screen for controls)
-
-5. Performance
-Interestingly, our bottleneck does not come from SPH or Marching Cube, but
-actually comes from the data transfer from GPU to CPU after generating the final
-mesh triangle data. We have to do so because we need to fill those data to Unity
-'s mesh data structures. If we turn off visualization, we can simulate more than
-30k particles in 60 fps. However with visualization, we can barely run 10k with
-acceptable framerate. (This is tested on a GTX 745).
 
 Reference:
 [1] Müller, Matthias, David Charypar, and Markus Gross. "Particle-based fluid
